@@ -109,7 +109,7 @@ categories:
     - "cs.RO"
     - "cs.AR"
     - "cs.DC"
-    weight: 1.0
+  weight: 1.0
 
 # Venue / institution bonus (matching in comments or title)
 venue_bonus: 0.3
