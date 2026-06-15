@@ -20,7 +20,7 @@ def load_config():
     config_path = os.path.join(script_dir, "..", "config", "keywords.yaml")
     if os.path.exists(config_path):
         with open(config_path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(config)
+            return yaml.safe_load(f)
     # Fallback defaults
     return {"top_n": 15, "hard_score_threshold": 0}
 
