@@ -212,11 +212,12 @@ def process_all_items(data: List[Dict], model_name: str, language: str, max_work
                 # Add default AI fields to ensure consistency
                 processed_data[idx] = data[idx]
                 processed_data[idx]['AI'] = {
-                    "category_tag": "",
-                    "tldr_cn": "Processing failed",
+                    "tldr": "Processing failed",
                     "motivation": "Processing failed",
                     "method": "Processing failed",
                     "result": "Processing failed",
+                    "conclusion": "Processing failed",
+                    "category_tag": "",
                     "why_matters": "",
                     "deep_read": False,
                     "deep_read_reason": "AI processing failed",
