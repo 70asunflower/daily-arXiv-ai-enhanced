@@ -115,13 +115,14 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
         item.update(code_info)
 
     """处理单个数据项"""
-    # Default structure with meaningful fallback values (9-field schema)
+    # Default structure with meaningful fallback values
     default_ai_fields = {
-        "category_tag": "",
-        "tldr_cn": "Summary generation failed",
+        "tldr": "Summary generation failed",
         "motivation": "Motivation analysis unavailable",
         "method": "Method extraction failed",
         "result": "Result analysis unavailable",
+        "conclusion": "Conclusion extraction failed",
+        "category_tag": "",
         "why_matters": "",
         "deep_read": False,
         "deep_read_reason": "AI processing failed",
