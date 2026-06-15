@@ -115,18 +115,25 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
         item.update(code_info)
 
     """处理单个数据项"""
-    # Default structure with meaningful fallback values
+    # Default structure with meaningful fallback values (9-field schema)
     default_ai_fields = {
-        "tldr": "Summary generation failed",
+        "category_tag": "",
+        "tldr_cn": "Summary generation failed",
         "motivation": "Motivation analysis unavailable",
         "method": "Method extraction failed",
         "result": "Result analysis unavailable",
-        "conclusion": "Conclusion extraction failed"
+        "why_matters": "",
+        "deep_read": False,
+        "deep_read_reason": "AI processing failed",
+        "open_source": "",
     }
     
     try:
         response: Structure = chain.invoke({
             "language": language,
+            "category_tag": item.get("category_tag", "支撑"),
+            "matched_keywords": ", ".join(item.get("matched_keywords", [])),
+            "score": f"{item.get('score', 0):.1f}",
             "content": item['summary']
         })
         item['AI'] = response.model_dump()
@@ -201,11 +208,15 @@ def process_all_items(data: List[Dict], model_name: str, language: str, max_work
                 # Add default AI fields to ensure consistency
                 processed_data[idx] = data[idx]
                 processed_data[idx]['AI'] = {
-                    "tldr": "Processing failed",
+                    "category_tag": "",
+                    "tldr_cn": "Processing failed",
                     "motivation": "Processing failed",
                     "method": "Processing failed",
                     "result": "Processing failed",
-                    "conclusion": "Processing failed"
+                    "why_matters": "",
+                    "deep_read": False,
+                    "deep_read_reason": "AI processing failed",
+                    "open_source": "",
                 }
     
     return processed_data

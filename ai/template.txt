@@ -1,4 +1,8 @@
-Please analyze the following abstract of papers. 
+Please analyze the following arXiv paper abstract.
 
-Content:
+Paper category tag: {category_tag}
+Matched keywords: {matched_keywords}
+Score: {score}
+
+Abstract:
 {content}

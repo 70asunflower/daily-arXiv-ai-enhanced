@@ -97,12 +97,48 @@ jobs:
                 ;;
         esac
         
+    - name: Score and tag papers
+      if: steps.dedup_check.outputs.has_new_content == 'true'
+      id: score_step
+      run: |
+        source .venv/bin/activate
+        today=${{ steps.crawl_step.outputs.crawl_date }}
+        echo "对论文进行关键词打分和分类标记... / Scoring and tagging papers..."
+        
+        cd ai
+        python scorer.py ../data/${today}.jsonl ../data/${today}_scored.jsonl
+        
+        # 检查打分是否成功 / Check if scoring was successful
+        if [ ! -f "../data/${today}_scored.jsonl" ]; then
+            echo "打分失败，未生成评分文件 / Scoring failed, no scored file generated"
+            exit 1
+        fi
+        echo "打分完成 / Scoring completed"
+
+    - name: Filter Top 15 + Intersection
+      if: steps.dedup_check.outputs.has_new_content == 'true'
+      id: filter_step
+      run: |
+        source .venv/bin/activate
+        today=${{ steps.crawl_step.outputs.crawl_date }}
+        echo "过滤 Top 15 高价值论文 + 交集类强制保留... / Filtering top 15 + intersection..."
+        
+        cd ai
+        python filter.py ../data/${today}_scored.jsonl ../data/${today}_top15.jsonl
+        
+        # 检查过滤是否成功 / Check if filtering was successful
+        if [ ! -f "../data/${today}_top15.jsonl" ]; then
+            echo "过滤失败，未生成 top15 文件 / Filtering failed, no top15 file generated"
+            exit 1
+        fi
+        echo "过滤完成 / Filtering completed"
+
     - name: AI Enhancement Processing
       if: steps.dedup_check.outputs.has_new_content == 'true'
       run: |
         source .venv/bin/activate
         today=${{ steps.crawl_step.outputs.crawl_date }}
-        echo "开始AI增强处理... / Starting AI enhancement processing..."
+        echo "开始AI增强处理 (仅处理 Top 15 + 交集论文)... / Starting AI enhancement (Top 15 + intersection only)..."
         
         cd ai
         export OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
@@ -110,7 +146,7 @@ jobs:
         export LANGUAGE="${{ vars.LANGUAGE }}"
         export MODEL_NAME="${{ vars.MODEL_NAME }}"
         
-        python enhance.py --data ../data/${today}.jsonl
+        python enhance.py --data ../data/${today}_top15.jsonl
         
         # 检查AI处理是否成功 / Check if AI processing was successful
         if [ $? -ne 0 ]; then

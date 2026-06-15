@@ -1,21 +1,15 @@
-### [{idx}] [{title}]({url})
-*{authors}*
+### [{idx}] [{score}] [{tag}] {title}
+*{authors}* | {cates}
 
-Main category: {cate}
+> **TL;DR**: {tldr_cn}
 
-TL;DR: {tldr}
+| 维度 | 内容 |
+|------|------|
+| 🎯 解决什么问题 | {motivation} |
+| 🔧 核心方法 | {method} |
+| 📊 关键结果 | {result} |
+| 💡 对我有什么用 | {why_matters} |
+| 📖 深读建议 | {deep_icon} {deep_reason} |
+| 💻 代码 | {open_source} |
 
-
-<details>
-  <summary>Details</summary>
-Motivation: {motivation}
-
-Method: {method}
-
-Result: {result}
-
-Conclusion: {conclusion}
-
-Abstract: {summary}
-
-</details>
+[📄 arXiv]({url}) | [📥 PDF]({pdf})
