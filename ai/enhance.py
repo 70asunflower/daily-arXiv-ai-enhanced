@@ -228,7 +228,7 @@ def main():
     language = os.environ.get("LANGUAGE", 'Chinese')
 
     # 检查并删除目标文件
-    target_file = args.data.replace('.jsonl', f'_AI_enhanced_{language}.jsonl')
+    target_file = args.data.replace('_top15.jsonl', '.jsonl').replace('.jsonl', f'_AI_enhanced_{language}.jsonl')
     if os.path.exists(target_file):
         os.remove(target_file)
         print(f'Removed existing file: {target_file}', file=sys.stderr)
