@@ -93,15 +93,16 @@ def compute_score(
 
     # Determine category_tag
     tag_priority = config["category_tag_priority"]
-    category_tag = "支撑"
+    tag_names = config.get("category_tag_names", {
+        "intersection": "Intersection",
+        "core_arch": "Arch-Infra",
+        "core_embodied": "Embodied",
+        "support": "Support",
+    })
+    category_tag = tag_names.get("support", "Support")
     for tag in tag_priority:
         if tag in matched_layers:
-            category_tag = {
-                "intersection": "交集",
-                "core_arch": "架构-infra",
-                "core_embodied": "具身",
-                "support": "支撑",
-            }.get(tag, "支撑")
+            category_tag = tag_names.get(tag, "Support")
             break
 
     is_intersection = "intersection" in matched_layers

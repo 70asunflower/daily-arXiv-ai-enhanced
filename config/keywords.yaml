@@ -154,3 +154,10 @@ category_tag_priority:
   - core_arch
   - core_embodied
   - support
+
+# Display names for category tags
+category_tag_names:
+  intersection: "Intersection"
+  core_arch: "Arch-Infra"
+  core_embodied: "Embodied"
+  support: "Support"

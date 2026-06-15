@@ -38,8 +38,8 @@ class Structure(BaseModel):
     # === New fields (not rendered by original frontend but available in JSONL) ===
 
     category_tag: str = Field(
-        default="支撑",
-        description="Category tag: 交集 / 架构-infra / 具身 / 支撑"
+        default="Support",
+        description="Category: Intersection / Arch-Infra / Embodied / Support"
     )
 
     why_matters: str = Field(
