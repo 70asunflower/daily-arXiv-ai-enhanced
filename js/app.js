@@ -13,6 +13,21 @@ let activeKeywords = []; // 存储激活的关键词
 let userKeywords = []; // 存储用户的关键词
 let activeAuthors = []; // 存储激活的作者
 let userAuthors = []; // 存储用户的作者
+
+// 强制覆盖 data-config.js（防止缓存导致 repoOwner 为 dw-dengwei）
+if (!window.DATA_CONFIG || window.DATA_CONFIG.repoOwner !== '70asunflower') {
+  window.DATA_CONFIG = {
+    repoOwner: '70asunflower',
+    repoName: 'daily-arXiv-ai-enhanced',
+    dataBranch: 'data',
+    getDataBaseUrl: function() {
+      return 'https://raw.githubusercontent.com/70asunflower/daily-arXiv-ai-enhanced/data';
+    },
+    getDataUrl: function(filePath) {
+      return 'https://raw.githubusercontent.com/70asunflower/daily-arXiv-ai-enhanced/data/' + filePath;
+    }
+  };
+}
 let currentPaperIndex = 0; // 当前查看的论文索引
 let currentFilteredPapers = []; // 当前过滤后的论文列表
 let textSearchQuery = ''; // 实时文本搜索查询
