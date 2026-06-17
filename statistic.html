@@ -149,5 +149,14 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="js/statistic.js"></script>
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('sw.js').catch(function(err) {
+                console.warn('[SW] Registration failed:', err);
+            });
+        });
+    }
+    </script>
 </body>
-</html> 
+</html>

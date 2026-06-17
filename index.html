@@ -10,14 +10,14 @@
     <title>Daily arXiv AI Enhanced</title>
     <link rel="icon" type="image/png" href="assets/logo2-removebg-preview.png">
     <link rel="shortcut icon" type="image/png" href="assets/logo2-removebg-preview.png">
-    <link rel="stylesheet" href="css/styles.css?v=2">
+    <link rel="stylesheet" href="css/styles.css?v=3">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
     <!-- Authentication Scripts -->
-    <script src="js/auth-config.js?v=2"></script>
-    <script src="js/auth.js?v=2"></script>
+    <script src="js/auth-config.js?v=3"></script>
+    <script src="js/auth.js?v=3"></script>
     <!-- Data Source Configuration (inlined to avoid cache issues with data-config.js) -->
     <script>
     const DATA_CONFIG = {
@@ -257,6 +257,18 @@
         </svg>
     </button>
 
-    <script src="js/app.js?v=2"></script>
+    <script src="js/app.js?v=3"></script>
+    <!-- Service Worker: forces network-first for navigation, bypasses stale HTTP cache -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('sw.js').then(function(reg) {
+                console.log('[SW] Registered:', reg.scope);
+            }).catch(function(err) {
+                console.warn('[SW] Registration failed:', err);
+            });
+        });
+    }
+    </script>
 </body>
-</html> 
+</html>
