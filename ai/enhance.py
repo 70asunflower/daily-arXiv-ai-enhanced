@@ -37,26 +37,15 @@ def parse_args():
 def process_single_item(chain, item: Dict, language: str) -> Dict:
     def is_sensitive(content: str) -> bool:
         """
-        调用 spam.dw-dengwei.workers.dev 接口检测内容是否包含敏感词。
-        返回 True 表示触发敏感词，False 表示未触发。
+        [DISABLED] 原先调用 spam.dw-dengwei.workers.dev 做敏感词检测。
+        该端点是上游作者（dw-dengwei）的基础设施，且 fail-closed：
+        一旦网络异常 / 返回非 200 / 缺字段就 return True，把整篇论文丢弃，
+        会导致 enhance 步骤产出空文件、前端静默无内容（workflow 仍 exit 0）。
+        同时每篇摘要都会被发往第三方端点，存在隐私与归属问题。
+        现直接 return False（不触发敏感词），避免静默数据丢失。
+        如需内容审核，请指向你自己的端点并替换下方实现。
         """
-        try:
-            resp = requests.post(
-                "https://spam.dw-dengwei.workers.dev",
-                json={"text": content},
-                timeout=5
-            )
-            if resp.status_code == 200:
-                result = resp.json()
-                # 约定接口返回 {"sensitive": true/false, ...}
-                return result.get("sensitive", True)
-            else:
-                # 如果接口异常，默认不触发敏感词
-                print(f"Sensitive check failed with status {resp.status_code}", file=sys.stderr)
-                return True
-        except Exception as e:
-            print(f"Sensitive check error: {e}", file=sys.stderr)
-            return True
+        return False
 
     def check_github_code(content: str) -> Dict:
         """提取并验证 GitHub 链接"""

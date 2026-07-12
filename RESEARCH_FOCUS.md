@@ -98,7 +98,7 @@
 ## 10. 安全
 
 - 密钥（OPENAI_API_KEY / TOKEN_GITHUB / ACCESS_PASSWORD）只在 **GitHub Secrets**，不进仓库。
-- LLM 输出经敏感词检测（`ai/enhance.py` 的 `is_sensitive`）；不打印密钥；不删除历史数据。
+- LLM 输出原经敏感词检测（`ai/enhance.py` 的 `is_sensitive`）；该检测依赖上游作者的第三方端点且 fail-closed，已**禁用**（直接 return False）以避免静默数据丢失。如需内容审核请指向自己的端点。不打印密钥；不删除历史数据。
 - 前端 “Interested Keywords / Authors” 仅 localStorage 本地排序高亮，**不影响**抓取/打分/筛选。
 
 ## 11. 想换研究方向时
