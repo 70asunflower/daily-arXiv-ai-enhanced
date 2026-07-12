@@ -115,24 +115,36 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
         item.update(code_info)
 
     """处理单个数据项"""
-    # Default structure with meaningful fallback values
+    # Default structure with meaningful fallback values (must match
+    # ai/structure.py 17-field schema so downstream convert.py / frontend
+    # never KeyError on a failed/partial LLM response).
     default_ai_fields = {
-        "tldr": "Summary generation failed",
-        "motivation": "Motivation analysis unavailable",
-        "method": "Method extraction failed",
-        "result": "Result analysis unavailable",
-        "conclusion": "Conclusion extraction failed",
+        "tldr": "摘要生成失败",
+        "motivation": "研究问题分析不可用",
+        "method": "方法提取失败",
+        "result": "结果分析不可用",
+        "conclusion": "结论提取失败",
         "category_tag": "",
-        "why_matters": "",
+        "sub_tags": "",
+        "problem": "论文摘要未明确",
+        "hardware": "论文摘要未明确",
+        "comm_mechanism": "论文摘要未明确",
+        "key_results": "论文摘要未明确",
+        "baseline": "论文摘要未明确",
+        "abc_tag": "",
+        "value_7xthor": "论文摘要未明确",
+        "infra_assumption": "论文摘要未明确",
+        "nvlink_free_holds": "论文摘要未明确",
+        "differentiation": "论文摘要未明确",
         "deep_read": False,
-        "deep_read_reason": "AI processing failed",
-        "open_source": "",
+        "deep_read_reason": "AI 处理失败",
+        "open_source": "未公开",
     }
     
     try:
         response: Structure = chain.invoke({
             "language": language,
-            "category_tag": item.get("category_tag", "支撑"),
+            "category_tag": item.get("category_tag", "Background-支撑"),
             "matched_keywords": ", ".join(item.get("matched_keywords", [])),
             "score": f"{item.get('score', 0):.1f}",
             "content": item['summary']
@@ -212,16 +224,26 @@ def process_all_items(data: List[Dict], model_name: str, language: str, max_work
                 # Add default AI fields to ensure consistency
                 processed_data[idx] = data[idx]
                 processed_data[idx]['AI'] = {
-                    "tldr": "Processing failed",
-                    "motivation": "Processing failed",
-                    "method": "Processing failed",
-                    "result": "Processing failed",
-                    "conclusion": "Processing failed",
-                    "category_tag": "",
-                    "why_matters": "",
+                    "tldr": "AI 处理失败",
+                    "motivation": "AI 处理失败",
+                    "method": "AI 处理失败",
+                    "result": "AI 处理失败",
+                    "conclusion": "AI 处理失败",
+                    "category_tag": data[idx].get("category_tag", ""),
+                    "sub_tags": "",
+                    "problem": "论文摘要未明确",
+                    "hardware": "论文摘要未明确",
+                    "comm_mechanism": "论文摘要未明确",
+                    "key_results": "论文摘要未明确",
+                    "baseline": "论文摘要未明确",
+                    "abc_tag": "",
+                    "value_7xthor": "论文摘要未明确",
+                    "infra_assumption": "论文摘要未明确",
+                    "nvlink_free_holds": "论文摘要未明确",
+                    "differentiation": "论文摘要未明确",
                     "deep_read": False,
-                    "deep_read_reason": "AI processing failed",
-                    "open_source": "",
+                    "deep_read_reason": "AI 处理失败",
+                    "open_source": "未公开",
                 }
     
     return processed_data

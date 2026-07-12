@@ -1,8 +1,8 @@
-Please analyze the following arXiv paper abstract.
+请分析以下 arXiv 论文摘要，并严格按照系统提示中的 20 个字段产出中文结构化情报报告。
 
-Paper category tag: {category_tag}
-Matched keywords: {matched_keywords}
-Score: {score}
+论文主类别（由打分模块给出，请勿修改）：{category_tag}
+命中关键词层：{matched_keywords}
+综合得分：{score}
 
-Abstract:
+摘要原文：
 {content}

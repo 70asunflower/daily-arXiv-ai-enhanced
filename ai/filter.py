@@ -1,88 +1,134 @@
 """
-Top-N Filter with Intersection Force-Include
+Daily triage filter  (research_focus.yaml driven)
 
-Reads scored JSONL, sorts by score descending, takes top N,
-and force-includes all intersection papers regardless of score.
+Reads scored JSONL, applies the hard-score threshold, then assigns every
+surviving paper to ONE of three daily tiers:
 
-Outputs: top15 JSONL + summary statistics
+  * must_read  (建议精读)  -- at most output.must_read (default 2)
+  * key        (今日重点)  -- at most output.key_papers (default 5)
+  * candidate  (今日候选)  -- at most output.candidate_papers (default 12)
+
+Selection rules
+---------------
+1. Drop papers with score < hard_score_threshold (pure noise).
+2. P0 intersection papers are always kept (force-include) even if below
+   the soft ordering, but still subject to the hard threshold.
+3. must_read: highest-scored papers that satisfy must_read_rules
+   (main category in A/B/C, reproducible open-source, system/low-bandwidth
+   relevance, score >= min_score). Capped at output.must_read.
+4. key: top scoring papers by score (includes must_read ones).
+5. candidate: next best related papers (score above a soft floor), excluding
+   those already in key. Capped at output.candidate_papers.
+6. Never pad tiers with weak papers; if the day is thin, emit fewer.
+
+Output keeps the `_top15.jsonl` filename so the existing workflow step
+(`python filter.py ... _top15.jsonl` -> enhance.py) keeps working.
+Each record gets a `tier` field: "must_read" | "key" | "candidate".
 """
 
 import json
 import sys
 import os
 import yaml
-from typing import List, Dict
+from typing import Dict, List
 
 
-def load_config():
-    """Load keywords.yaml for top_n and threshold settings."""
+CONFIG_NAME = "research_focus.yaml"
+
+
+def load_config() -> Dict:
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(script_dir, "..", "config", "keywords.yaml")
+    config_path = os.path.join(script_dir, "..", "config", CONFIG_NAME)
     if os.path.exists(config_path):
         with open(config_path, "r", encoding="utf-8") as f:
             return yaml.safe_load(f)
-    # Fallback defaults
-    return {"top_n": 15, "hard_score_threshold": 0}
+    return {
+        "output": {"key_papers": 5, "candidate_papers": 12, "must_read": 2,
+                   "hard_score_threshold": -100},
+        "must_read_rules": {"require_main_category": ["A", "B", "C"],
+                             "require_reproducible": True,
+                             "require_system_or_lowbandwidth": True,
+                             "min_score": 10},
+    }
 
 
-def filter_papers(scored_data: List[Dict], config: Dict) -> List[Dict]:
-    """
-    Filter papers: Top N by score + force-include intersection papers.
+def _satisfies_must_read(item: Dict, rules: Dict) -> bool:
+    if item.get("score", 0) < rules.get("min_score", 10):
+        return False
+    if item.get("cat_code") not in rules.get("require_main_category", ["A", "B", "C"]):
+        return False
+    if rules.get("require_reproducible", True) and not item.get("open_source_hit", False):
+        return False
+    if rules.get("require_system_or_lowbandwidth", True) and not item.get("system_or_lowbw_hit", False):
+        return False
+    return True
 
-    Args:
-        scored_data: List of scored paper dicts (with score, intersection fields)
-        config: YAML configuration
 
-    Returns:
-        Filtered list of papers
-    """
-    top_n = config.get("top_n", 15)
-    threshold = config.get("hard_score_threshold", 0)
+def filter_papers(scored: List[Dict], cfg: Dict) -> List[Dict]:
+    out = cfg.get("output", {})
+    hard = out.get("hard_score_threshold", -100)
+    n_key = out.get("key_papers", 5)
+    n_cand = out.get("candidate_papers", 12)
+    n_must = out.get("must_read", 2)
+    rules = cfg.get("must_read_rules", {})
 
-    # Separate intersection and non-intersection papers
-    intersection_papers = []
-    normal_papers = []
+    # 1. hard threshold
+    survivors = [p for p in scored if p.get("score", 0) >= hard]
+    # also keep P0 intersections even if below hard (they are forced)
+    forced = [p for p in scored if p.get("intersection") and p.get("score", 0) < hard]
+    seen = {id(p) for p in survivors}
+    for p in forced:
+        if id(p) not in seen:
+            survivors.append(p)
+            seen.add(id(p))
 
-    for item in scored_data:
-        score = item.get("score", 0)
-        is_intersection = item.get("intersection", False)
+    if not survivors:
+        return []
 
-        # Skip papers below hard threshold (unless intersection)
-        if not is_intersection and score <= threshold:
+    # sort by score desc (stable)
+    survivors.sort(key=lambda x: -x.get("score", 0))
+
+    result: List[Dict] = []
+    used_ids = set()
+
+    def take(p):
+        uid = id(p)
+        if uid in used_ids:
+            return False
+        used_ids.add(uid)
+        result.append(p)
+        return True
+
+    # 3. must_read
+    must_pool = [p for p in survivors if _satisfies_must_read(p, rules)]
+    for p in must_pool[:n_must]:
+        p["tier"] = "must_read"
+        take(p)
+
+    # 4. key (top by score, includes any remaining must_read candidates not yet taken)
+    for p in survivors:
+        if len([r for r in result if r.get("tier") == "key" or r.get("tier") == "must_read"]) >= n_key:
+            break
+        if id(p) in used_ids:
             continue
+        p["tier"] = "key"
+        take(p)
 
-        if is_intersection:
-            intersection_papers.append(item)
-        else:
-            normal_papers.append(item)
+    # 5. candidate (next best, related, not already taken)
+    soft_floor = 0  # anything that survived the hard threshold is "related enough"
+    for p in survivors:
+        if len([r for r in result if r.get("tier") == "candidate"]) >= n_cand:
+            break
+        if id(p) in used_ids:
+            continue
+        if p.get("score", 0) < soft_floor:
+            continue
+        p["tier"] = "candidate"
+        take(p)
 
-    # Sort normal papers by score descending
-    normal_papers.sort(key=lambda x: -x.get("score", 0))
-
-    # Take top N normal papers
-    top_normal = normal_papers[:top_n]
-
-    # Combine: all intersection + top N normal (deduplicated by id)
-    seen_ids = set()
-    result = []
-
-    # Intersection papers first (guaranteed inclusion)
-    for p in intersection_papers:
-        pid = p["id"]
-        if pid not in seen_ids:
-            seen_ids.add(pid)
-            result.append(p)
-
-    # Then top N normal papers
-    for p in top_normal:
-        pid = p["id"]
-        if pid not in seen_ids:
-            seen_ids.add(pid)
-            result.append(p)
-
-    # Sort final output by score descending
-    result.sort(key=lambda x: -x.get("score", 0))
-
+    # final order: must_read, key, candidate (each by score desc)
+    order = {"must_read": 0, "key": 1, "candidate": 2}
+    result.sort(key=lambda x: (order.get(x.get("tier"), 3), -x.get("score", 0)))
     return result
 
 
@@ -94,7 +140,7 @@ def main():
     input_path = sys.argv[1]
     output_path = sys.argv[2] if len(sys.argv) > 2 else input_path.replace("_scored.jsonl", "_top15.jsonl")
 
-    # Read scored JSONL
+    config = load_config()
     data = []
     with open(input_path, "r", encoding="utf-8") as f:
         for line in f:
@@ -102,25 +148,19 @@ def main():
             if line:
                 data.append(json.loads(line))
 
-    config = load_config()
     filtered = filter_papers(data, config)
 
-    # Write output
     with open(output_path, "w", encoding="utf-8") as f:
         for item in filtered:
             f.write(json.dumps(item, ensure_ascii=False) + "\n")
 
-    # Summary
-    intersection_count = sum(1 for p in filtered if p.get("intersection"))
-    normal_count = len(filtered) - intersection_count
-    scores = [p.get("score", 0) for p in filtered]
-    max_score = max(scores) if scores else 0
-    min_score = min(scores) if scores else 0
-
-    print(f"Filter: {len(data)} → {len(filtered)} papers", file=sys.stderr)
-    print(f"  Intersection (force-included): {intersection_count}", file=sys.stderr)
-    print(f"  Top-N normal: {normal_count}", file=sys.stderr)
-    print(f"  Score range: {min_score:.1f} - {max_score:.1f}", file=sys.stderr)
+    counts = {"must_read": 0, "key": 0, "candidate": 0}
+    for p in filtered:
+        counts[p.get("tier", "candidate")] = counts.get(p.get("tier", "candidate"), 0) + 1
+    print(f"Filter: {len(data)} -> {len(filtered)} papers", file=sys.stderr)
+    print(f"  建议精读 (must_read): {counts['must_read']}", file=sys.stderr)
+    print(f"  今日重点 (key):       {counts['key']}", file=sys.stderr)
+    print(f"  今日候选 (candidate): {counts['candidate']}", file=sys.stderr)
 
 
 if __name__ == "__main__":

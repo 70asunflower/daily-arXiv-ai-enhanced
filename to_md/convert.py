@@ -3,76 +3,121 @@ import argparse
 import os
 from itertools import count
 
+# 新分类体系（与 config/research_focus.yaml 对齐）
+TAXONOMY_ORDER = ['A', 'B', 'C', 'Infra', 'Arch', 'Space', 'Background']
+TAXONOMY_TAGS = {
+    'A': 'A-测量与瓶颈',
+    'B': 'B-通信与调度',
+    'C': 'C-容错与弹性',
+    'Infra': 'Infra-推理引擎',
+    'Arch': 'Arch-体系结构',
+    'Space': 'Space-场景延伸',
+    'Background': 'Background-支撑',
+}
+LEGACY_TAG_MAP = {
+    'Intersection': 'B',
+    'Arch-Infra': 'Infra',
+    'Embodied': 'Background',
+    'Support': 'Background',
+}
+TIER_LABELS = {'must_read': '建议精读', 'key': '今日重点', 'candidate': '今日候选'}
+
+
+def resolve_code(item):
+    c = item.get('cat_code')
+    if c and c in TAXONOMY_TAGS:
+        return c
+    ct = item.get('category_tag')
+    if ct and ct in LEGACY_TAG_MAP:
+        return LEGACY_TAG_MAP[ct]
+    for k, v in TAXONOMY_TAGS.items():
+        if v == ct:
+            return k
+    return 'Background'
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data", type=str, help="Path to the jsonline file")
+    parser.add_argument("--data", type=str, help="Path to the AI-enhanced jsonline file")
     args = parser.parse_args()
+
     data = []
-    preference = os.environ.get('CATEGORIES', 'cs.CV, cs.CL').split(',')
-    preference = list(map(lambda x: x.strip(), preference))
-    def rank(cate):
-        if cate in preference:
-            return preference.index(cate)
-        else:
-            return len(preference)
-
-    with open(args.data, "r") as f:
+    with open(args.data, "r", encoding="utf-8") as f:
         for line in f:
-            data.append(json.loads(line))
+            line = line.strip()
+            if line:
+                data.append(json.loads(line))
 
-    # Sort by score descending (new), then category rank
-    data.sort(key=lambda x: (-x.get("score", 0), rank(x["categories"][0])))
-
-    categories = set([item["categories"][0] for item in data])
-    template = open("paper_template.md", "r").read()
-    categories = sorted(categories, key=rank)
-    cnt = {cate: 0 for cate in categories}
+    # 按新分类体系（cat_code）分组；旧数据按 legacy 映射回退
+    groups = {}
+    order_index = {c: i for i, c in enumerate(TAXONOMY_ORDER)}
     for item in data:
-        if item["categories"][0] not in cnt.keys():
-            continue
-        cnt[item["categories"][0]] += 1
+        code = resolve_code(item)
+        groups.setdefault(code, []).append(item)
 
-    markdown = f"<div id=toc></div>\n\n# Table of Contents\n\n"
-    for cate_idx, cate in enumerate(categories):
-        markdown += f"- [{cate}](#{cate}) [Total: {cnt[cate]}]\n"
+    sorted_codes = sorted(groups.keys(), key=lambda c: order_index.get(c, 999))
+
+    # 组内排序：建议精读 > 今日重点 > 今日候选 > 其它；同级按分数降序
+    tier_rank = {'must_read': 0, 'key': 1, 'candidate': 2, '': 3, None: 3}
+    for code in groups:
+        groups[code].sort(key=lambda x: (tier_rank.get(x.get('tier'), 3), -x.get('score', 0)))
+
+    template = open("paper_template.md", "r", encoding="utf-8").read()
+
+    markdown = "# 论文雷达 / Paper Radar\n\n"
+    markdown += "## 目录 / Contents\n\n"
+    for code in sorted_codes:
+        tag = TAXONOMY_TAGS.get(code, code)
+        cnt = len(groups[code])
+        markdown += f"- [{tag}](#{code}) [{cnt}]\n"
+    markdown += "\n---\n\n"
 
     idx = count(1)
-    for cate in categories:
-        markdown += f"\n\n<div id='{cate}'></div>\n\n"
-        markdown += f"# {cate} [[Back]](#toc)\n\n"
-        papers = []
-        for item in data:
-            if item["categories"][0] == cate:
-                ai_data = item.get('AI', {})
-                if not ai_data or not isinstance(ai_data, dict):
-                    continue
+    for code in sorted_codes:
+        tag = TAXONOMY_TAGS.get(code, code)
+        markdown += f'\n## {tag} <a id="{code}"></a>\n\n'
+        for item in groups[code]:
+            ai = item.get('AI')
+            if not isinstance(ai, dict):
+                continue
+            score = item.get('score', 0)
+            cat_tag = item.get('category_tag', '')
+            tier = item.get('tier') or ''
+            tier_label = TIER_LABELS.get(tier, '')
+            deep_icon = ' ✅' if ai.get('deep_read') else ''
+            tldr = ai.get('tldr', '')
 
-                required_fields = ['tldr', 'motivation', 'method', 'result', 'conclusion']
-                if not all(field in ai_data for field in required_fields):
-                    continue
+            markdown += template.format(
+                idx=next(idx),
+                title=item.get('title', ''),
+                authors=', '.join(item.get('authors', []) or []),
+                url=item.get('abs') or item.get('pdf') or f"https://arxiv.org/abs/{item.get('id', '')}",
+                cat=cat_tag,
+                tier=tier_label,
+                score=f"{score:.1f}",
+                tldr=tldr + deep_icon,
+                problem=ai.get('problem', ''),
+                hardware=ai.get('hardware', ''),
+                method=ai.get('method', ''),
+                comm_mechanism=ai.get('comm_mechanism', ''),
+                key_results=ai.get('key_results', ''),
+                baseline=ai.get('baseline', ''),
+                abc_tag=ai.get('abc_tag', ''),
+                value_7xthor=ai.get('value_7xthor', ''),
+                infra_assumption=ai.get('infra_assumption', ''),
+                nvlink_free_holds=ai.get('nvlink_free_holds', ''),
+                differentiation=ai.get('differentiation', ''),
+                deep_read=('✅ 建议精读' if ai.get('deep_read') else '—'),
+                open_source=ai.get('open_source', '未公开'),
+                motivation=ai.get('motivation', ''),
+                result=ai.get('result', ''),
+                conclusion=ai.get('conclusion', ''),
+                summary=item.get('summary', '')
+            )
 
-                score = item.get("score", 0)
-                tag = item.get("category_tag", "")
-                deep_icon = " ✅" if ai_data.get("deep_read") else ""
-                tldr = ai_data.get('tldr', '')
-                if tag:
-                    tldr = f"[{tag}][{score:.1f}]{deep_icon} {tldr}"
-
-                papers.append(
-                    template.format(
-                        title=item["title"],
-                        authors=",".join(item["authors"]),
-                        summary=item["summary"],
-                        url=item['abs'],
-                        tldr=tldr,
-                        motivation=ai_data.get('motivation', ''),
-                        method=ai_data.get('method', ''),
-                        result=ai_data.get('result', ''),
-                        conclusion=ai_data.get('conclusion', ''),
-                        cate=item['categories'][0],
-                        idx=next(idx)
-                    )
-                )
-        markdown += "\n\n".join(papers)
-    with open(args.data.split('_')[0] + '.md', "w") as f:
+    base = os.path.basename(args.data)
+    name = base.split('_AI_enhanced_')[0].rsplit('.jsonl', 1)[0]
+    out = name + '.md'
+    with open(out, "w", encoding="utf-8") as f:
         f.write(markdown)
+    print(f"Converted {len(data)} papers -> {out}")

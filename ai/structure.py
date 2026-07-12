@@ -2,62 +2,101 @@ from pydantic import BaseModel, Field
 
 
 class Structure(BaseModel):
-    """Output schema: keeps original field names for frontend backward-compat, adds new fields."""
+    """Output schema for the 17-field paper intelligence report.
 
-    # === Original fields (same names as before, frontend expects these) ===
+    Field names are kept mostly stable for frontend/markdown backward-compat:
+    tldr / motivation / method / result / conclusion are rendered by the
+    existing frontend and convert.py. New fields (problem, hardware, comm_mechanism,
+    key_results, baseline, abc_tag, value_7xthor, infra_assumption, nvlink_free_holds,
+    differentiation, sub_tags, open_source) are available in the JSONL and rendered
+    in the markdown where present.
+    """
 
+    # === Core rendered fields (frontend + markdown) ===
     tldr: str = Field(
         default="",
-        description="One-sentence TL;DR in Chinese, ≤50 characters, punchy. The original 'tldr' field name is kept for frontend compatibility."
+        description="一句话 TL;DR（中文，≤50 字，精炼）。仍保留字段名 tldr 以兼容前端。",
     )
-
     motivation: str = Field(
         default="",
-        description="What problem does this paper solve? 1-2 sentences."
+        description="研究问题：论文要解决什么问题？1-2 句。",
     )
-
     method: str = Field(
         default="",
-        description="Core method. For system/hardware papers: must specify hardware platform (H100/A100/FPGA/ASIC), "
-                    "key technique (kernel fusion/systolic array/PagedAttention), and implementation level "
-                    "(operator-level/compiler-level/system-level). 2-3 sentences."
+        description="核心方法。系统/硬件论文必须写明硬件平台（Jetson Thor/A100/H100/FPGA/ASIC）、"
+                    "关键技术（通信压缩/分区/overlap/KV迁移/量化）、实现层级（算子/编译/系统）。2-3 句。",
     )
-
     result: str = Field(
         default="",
-        description="Key quantitative results. Must include: speedup ratio (end-to-end vs operator-level), "
-                    "latency/throughput/power numbers, comparison baseline (e.g. vs FlashAttention v2), "
-                    "and measurement scope (single GPU / multi-node / etc)."
+        description="关键量化结果：吞吐、TTFT、TPOT、尾延迟、带宽、通信量、扩展效率、能效、恢复时间；"
+                    "必须给出对比基线与测量口径。禁止“性能提升”这类空话。",
     )
-
     conclusion: str = Field(
         default="",
-        description="1-sentence conclusion or takeaway message."
+        description="1 句结论或一句话 takeaway。",
     )
 
-    # === New fields (not rendered by original frontend but available in JSONL) ===
-
+    # === New intelligence fields (17-field report) ===
     category_tag: str = Field(
-        default="Support",
-        description="Category: Intersection / Arch-Infra / Embodied / Support"
+        default="Background-支撑",
+        description="主类别（由 scorer 输入，取值之一：A-测量与瓶颈 / B-通信与调度 / "
+                    "C-容错与弹性 / Infra-推理引擎 / Arch-体系结构 / Space-场景延伸 / Background-支撑）",
     )
-
-    why_matters: str = Field(
+    sub_tags: str = Field(
         default="",
-        description="Why this paper matters to a researcher working on Embodied AI × AI Infra / accelerator design. 1 sentence."
+        description="副标签（逗号分隔的短代码，如 B,Arch；多个类别命中时的次要类别）",
     )
-
+    problem: str = Field(
+        default="",
+        description="要解决的问题（与 motivation 互补：更聚焦实验/系统层面的 gap）",
+    )
+    hardware: str = Field(
+        default="",
+        description="系统与硬件环境：节点数、GPU/加速器型号、互联（以太网/25GbE/NVLink 有无）、"
+                    "内存/带宽配置。论文摘要未明确则写“论文摘要未明确”。",
+    )
+    comm_mechanism: str = Field(
+        default="",
+        description="并行/通信/调度/容错机制：TP/PP/混合并行、collective、压缩、overlap、"
+                    "KV 迁移/卸载、prefill/decode 分离、容错/恢复策略。无则写“论文摘要未明确”。",
+    )
+    key_results: str = Field(
+        default="",
+        description="关键量化结果（结构化列出，含单位与口径）",
+    )
+    baseline: str = Field(
+        default="",
+        description="对比基线与方法 + 测量口径（如 vs vLLM / vs Megatron，单节点/多节点）",
+    )
+    abc_tag: str = Field(
+        default="",
+        description="对应 A/B/C 哪一项（A 测量与瓶颈 / B 通信与调度 / C 容错弹性），或 Background",
+    )
+    value_7xthor: str = Field(
+        default="",
+        description="对 7×Jetson Thor 课题的直接启发：哪些变量/方法可复现或改造",
+    )
+    infra_assumption: str = Field(
+        default="",
+        description="依赖的数据中心假设（如高带宽节点间、NVLink、充足内存），论文摘要未明确写“论文摘要未明确”",
+    )
+    nvlink_free_holds: str = Field(
+        default="",
+        description="放到无 NVLink、受限以太网环境下是否仍然成立？给出判断与原因",
+    )
+    differentiation: str = Field(
+        default="",
+        description="我的可能差异化研究点（结合 A/B/C 与 7×Thor 约束）",
+    )
     deep_read: bool = Field(
         default=False,
-        description="True if recommending deep read, False if skim-only"
+        description="是否建议精读（True/False），并见于 deep_read_reason 说明",
     )
-
     deep_read_reason: str = Field(
         default="",
-        description="Reason for the deep read recommendation or skim-only."
+        description="建议精读/略读的理由",
     )
-
     open_source: str = Field(
         default="",
-        description="GitHub link or '未公开' if no open source code available"
+        description="开源代码链接（github.com/...），否则写“未公开”",
     )

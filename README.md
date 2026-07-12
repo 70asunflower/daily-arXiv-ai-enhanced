@@ -9,6 +9,8 @@
 
 This innovative tool transforms how you stay updated with arXiv papers by combining automated crawling with AI-powered summarization.
 
+> **研究定位 / Research focus:** 面向「带宽受限、多节点边缘集群中的大模型分布式推理」的论文情报系统（实验载体：7×NVIDIA Jetson Thor，无 NVLink）。详见 [RESEARCH_FOCUS.md](./RESEARCH_FOCUS.md)。
+
 
 ## ✨ Key Features
 
@@ -33,7 +35,7 @@ This innovative tool transforms how you stay updated with arXiv papers by combin
 - One-click copy in Settings to export your keywords and authors configuration
 - Seamlessly combine exported preferences with SKILL for reproducible and shareable setups
 
-👉 **[Try it now!](https://dw-dengwei.github.io/daily-arXiv-ai-enhanced/)** - No installation required
+👉 **[Try it now!](https://70asunflower.github.io/daily-arXiv-ai-enhanced/)** - No installation required
 
 
 
@@ -43,9 +45,9 @@ https://github.com/user-attachments/assets/b25712a4-fb8d-484f-863d-e8da6922f9d7
 
 
 # How to use
-This repo will daily crawl arXiv papers about **cs.CV, cs.GR, cs.CL and cs.AI**, and use **DeepSeek** to summarize the papers in **Chinese**.
+This repo is a paper-radar for **bandwidth-constrained, multi-node edge-cluster LLM distributed inference**. It daily crawls arXiv categories **cs.DC, cs.AR, cs.PF, cs.NI, cs.OS** (core) plus **cs.LG, cs.ET** (support, keyword-filtered), and uses an LLM to produce structured Chinese intelligence reports classified into A-测量与瓶颈 / B-通信与调度 / C-容错与弹性 / Infra-推理引擎 / Arch-体系结构 / Space-场景延伸.
 If you wish to crawl other arXiv categories, use other LLMs, or other languages, please follow the instructions.
-Otherwise, you can directly use this repo in https://dw-dengwei.github.io/daily-arXiv-ai-enhanced/. Please star it if you like :)
+Otherwise, you can directly use this repo in https://70asunflower.github.io/daily-arXiv-ai-enhanced/. Please star it if you like :)
 
 **Instructions:**
 1. Fork this repo to your own account and delete my own information in [buy-me-a-coffee](./buy-me-a-coffee/README.md).
@@ -55,7 +57,7 @@ Otherwise, you can directly use this repo in https://dw-dengwei.github.io/daily-
 5. [Optional] Set a password in `secrets.ACCESS_PASSWORD` if you do not wish others to access your page. (see https://github.com/dw-dengwei/daily-arXiv-ai-enhanced/pull/64)
 6. Go to Variables. Variables are shown as plain text and are used for non-sensitive data
 7. Create the following repository variables:
-   1. `CATEGORIES`: separate the categories with ",", such as "cs.CL, cs.CV"
+   1. `CATEGORIES`: separate the categories with ",", such as "cs.DC, cs.AR, cs.PF, cs.NI, cs.OS, cs.LG, cs.ET"
    2. `LANGUAGE`: such as "Chinese" or "English"
    3. `MODEL_NAME`: such as "deepseek-chat"
    4. `EMAIL`: your email for push to GitHub
@@ -139,7 +141,7 @@ We sincerely thank the following individuals and organizations for their promoti
 
 # Star history
 
-[![Stargazers over time](https://starchart.cc/dw-dengwei/daily-arXiv-ai-enhanced.svg?variant=adaptive)](https://starchart.cc/dw-dengwei/daily-arXiv-ai-enhanced)
+[![Stargazers over time](https://starchart.cc/70asunflower/daily-arXiv-ai-enhanced.svg?variant=adaptive)](https://starchart.cc/70asunflower/daily-arXiv-ai-enhanced)
 
 # Buy me a coffee
 [here](./buy-me-a-coffee/README.md)

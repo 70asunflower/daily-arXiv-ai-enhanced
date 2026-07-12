@@ -408,7 +408,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function fetchGitHubStats() {
   try {
-    const response = await fetch('https://api.github.com/repos/dw-dengwei/daily-arXiv-ai-enhanced');
+    const response = await fetch('https://api.github.com/repos/70asunflower/daily-arXiv-ai-enhanced');
     const data = await response.json();
     const starCount = data.stargazers_count;
     const forkCount = data.forks_count;
@@ -909,6 +909,47 @@ async function loadPapersByDate(date) {
   }
 }
 
+// ===== 新分类体系（与 config/research_focus.yaml 对齐）=====
+const TAXONOMY_ORDER = ['A', 'B', 'C', 'Infra', 'Arch', 'Space', 'Background'];
+const TAXONOMY_TAGS = {
+  'A': 'A-测量与瓶颈',
+  'B': 'B-通信与调度',
+  'C': 'C-容错与弹性',
+  'Infra': 'Infra-推理引擎',
+  'Arch': 'Arch-体系结构',
+  'Space': 'Space-场景延伸',
+  'Background': 'Background-支撑'
+};
+// 旧数据（category_tag 为英文标签）向后兼容映射
+const LEGACY_TAG_MAP = {
+  'Intersection': 'B',
+  'Arch-Infra': 'Infra',
+  'Embodied': 'Background',
+  'Support': 'Background'
+};
+const TIER_LABELS = {
+  'must_read': '建议精读',
+  'key': '今日重点',
+  'candidate': '今日候选'
+};
+function resolveTaxCode(paper) {
+  if (paper.cat_code && TAXONOMY_TAGS[paper.cat_code]) return paper.cat_code;
+  const legacy = paper.category_tag;
+  if (legacy && LEGACY_TAG_MAP[legacy]) return LEGACY_TAG_MAP[legacy];
+  if (legacy) {
+    const code = Object.keys(TAXONOMY_TAGS).find(k => TAXONOMY_TAGS[k] === legacy);
+    if (code) return code;
+  }
+  return 'Background';
+}
+function resolveTaxTag(paper, code) {
+  if (paper.category_tag && paper.category_tag === TAXONOMY_TAGS[code]) return paper.category_tag;
+  return TAXONOMY_TAGS[code] || code;
+}
+function tierLabel(tier) {
+  return TIER_LABELS[tier] || '';
+}
+
 function parseJsonlData(jsonlText, date) {
   const result = {};
   
@@ -922,29 +963,51 @@ function parseJsonlData(jsonlText, date) {
         return;
       }
       
-      let allCategories = Array.isArray(paper.categories) ? paper.categories : [paper.categories];
+      const allCategories = Array.isArray(paper.categories) ? paper.categories : [paper.categories];
       
-      const primaryCategory = allCategories[0];
+      // 按新分类体系（cat_code）分组；旧数据按 legacy 映射回退
+      const taxCode = resolveTaxCode(paper);
+      const taxTag = resolveTaxTag(paper, taxCode);
       
-      if (!result[primaryCategory]) {
-        result[primaryCategory] = [];
+      if (!result[taxCode]) {
+        result[taxCode] = [];
       }
       
-      const summary = paper.AI && paper.AI.tldr ? paper.AI.tldr : paper.summary;
+      const ai = (paper.AI && typeof paper.AI === 'object') ? paper.AI : {};
+      const summary = ai.tldr ? ai.tldr : (paper.summary || '');
       
-      result[primaryCategory].push({
+      result[taxCode].push({
         title: paper.title,
         url: paper.abs || paper.pdf || `https://arxiv.org/abs/${paper.id}`,
         authors: Array.isArray(paper.authors) ? paper.authors.join(', ') : paper.authors,
-        category: allCategories,
+        category: taxTag,
+        allCategories: allCategories,
+        taxonomyCode: taxCode,
+        taxonomyTag: taxTag,
+        tier: paper.tier || null,
+        score: (typeof paper.score === 'number') ? paper.score : 0,
         summary: summary,
         details: paper.summary || '',
         date: date,
         id: paper.id,
-        motivation: paper.AI && paper.AI.motivation ? paper.AI.motivation : '',
-        method: paper.AI && paper.AI.method ? paper.AI.method : '',
-        result: paper.AI && paper.AI.result ? paper.AI.result : '',
-        conclusion: paper.AI && paper.AI.conclusion ? paper.AI.conclusion : '',
+        // 旧 5 字段（前端兼容）
+        motivation: ai.motivation || '',
+        method: ai.method || '',
+        result: ai.result || '',
+        conclusion: ai.conclusion || '',
+        // 新 17 字段情报
+        problem: ai.problem || '',
+        hardware: ai.hardware || '',
+        comm_mechanism: ai.comm_mechanism || '',
+        key_results: ai.key_results || '',
+        baseline: ai.baseline || '',
+        abc_tag: ai.abc_tag || '',
+        value_7xthor: ai.value_7xthor || '',
+        infra_assumption: ai.infra_assumption || '',
+        nvlink_free_holds: ai.nvlink_free_holds || '',
+        differentiation: ai.differentiation || '',
+        deep_read: !!ai.deep_read,
+        open_source: ai.open_source || '',
         code_url: paper.code_url || '',
         code_stars: paper.code_stars || 0,
         code_last_update: paper.code_last_update || ''
@@ -966,10 +1029,17 @@ function getAllCategories(data) {
     catePaperCount[category] = data[category] ? data[category].length : 0;
   });
   
+  const sortedCategories = categories.slice().sort((a, b) => {
+    const ia = TAXONOMY_ORDER.indexOf(a);
+    const ib = TAXONOMY_ORDER.indexOf(b);
+    const ra = ia === -1 ? 999 : ia;
+    const rb = ib === -1 ? 999 : ib;
+    if (ra !== rb) return ra - rb;
+    return a.localeCompare(b);
+  });
+  
   return {
-    sortedCategories: categories.sort((a, b) => {
-      return a.localeCompare(b);
-    }),
+    sortedCategories: sortedCategories,
     categoryCounts: catePaperCount
   };
 }
@@ -991,7 +1061,8 @@ function renderCategoryFilter(categories) {
     const count = categoryCounts[category];
     const button = document.createElement('button');
     button.className = `category-button ${category === currentCategory ? 'active' : ''}`;
-    button.innerHTML = `${category}<span class="category-count">${count}</span>`;
+    const displayName = TAXONOMY_TAGS[category] || category;
+    button.innerHTML = `${displayName}<span class="category-count">${count}</span>`;
     button.dataset.category = category;
     button.addEventListener('click', () => {
       filterByCategory(category);
@@ -1128,6 +1199,18 @@ function renderPapers() {
   
   // 创建匹配论文的集合
   let filteredPapers = [...papers];
+
+  // 新分级排序：无激活筛选时，优先 建议精读 > 今日重点 > 今日候选 > 其它；同级按分数降序
+  const hasActiveFilter = (textSearchQuery && textSearchQuery.trim().length > 0) || activeKeywords.length > 0 || activeAuthors.length > 0;
+  if (!hasActiveFilter) {
+    const tierRank = { must_read: 0, key: 1, candidate: 2, '': 3, null: 3 };
+    filteredPapers.sort((a, b) => {
+      const ta = tierRank[a.tier] !== undefined ? tierRank[a.tier] : 3;
+      const tb = tierRank[b.tier] !== undefined ? tierRank[b.tier] : 3;
+      if (ta !== tb) return ta - tb;
+      return (b.score || 0) - (a.score || 0);
+    });
+  }
 
   // 重置所有论文的匹配状态，避免上次渲染的残留
   filteredPapers.forEach(p => {
@@ -1368,9 +1451,9 @@ function renderPapers() {
       paperCard.title = `匹配: ${paper.matchReason.join(' | ')}`;
     }
     
-    const categoryTags = paper.allCategories ? 
-      paper.allCategories.map(cat => `<span class="category-tag">${cat}</span>`).join('') : 
-      `<span class="category-tag">${paper.category}</span>`;
+    const tierBadge = paper.tier ? `<span class="tier-badge tier-${paper.tier}">${tierLabel(paper.tier)}</span>` : '';
+    const taxBadge = `<span class="category-tag tax-tag">${paper.taxonomyTag || paper.category}</span>`;
+    const categoryTags = taxBadge + tierBadge;
     
     // 组合需要高亮的词：关键词 + 文本搜索
     const titleSummaryTerms = [];
@@ -1508,6 +1591,22 @@ function showPaperDetails(paper, paperIndex) {
     ? highlightMatches(paper.conclusion, modalTitleTerms, 'keyword-highlight') 
     : paper.conclusion;
   
+  // 新 17 字段情报：按需高亮
+  const hlNew = (txt) => (txt && modalTitleTerms.length) ? highlightMatches(txt, modalTitleTerms, 'keyword-highlight') : txt;
+  const newFieldSecs = [];
+  const pushNew = (title, val) => { if (val) newFieldSecs.push(`<div class="paper-section"><h4>${title}</h4><p>${hlNew(val)}</p></div>`); };
+  pushNew('Problem', paper.problem);
+  pushNew('Hardware / Interconnect', paper.hardware);
+  pushNew('Comm / Scheduling / Fault', paper.comm_mechanism);
+  pushNew('Key Results', paper.key_results);
+  pushNew('Baseline', paper.baseline);
+  pushNew('A/B/C', paper.abc_tag);
+  pushNew('Value to 7×Thor', paper.value_7xthor);
+  pushNew('Infra Assumption', paper.infra_assumption);
+  pushNew('Holds w/o NVLink', paper.nvlink_free_holds);
+  pushNew('Differentiation', paper.differentiation);
+  const metaLine = `<p class="paper-meta-line"><strong>建议精读：</strong>${paper.deep_read ? '✅ 建议精读' : '—'}${paper.open_source ? ` &nbsp;|&nbsp; <strong>开源：</strong><a href="${paper.open_source}" target="_blank" rel="noopener">${paper.open_source}</a>` : ` &nbsp;|&nbsp; <strong>开源：</strong>未公开`}</p>`;
+  
   // 判断是否需要显示高亮说明
   const showHighlightLegend = activeKeywords.length > 0 || activeAuthors.length > 0;
   
@@ -1529,7 +1628,9 @@ function showPaperDetails(paper, paperIndex) {
         ${paper.method ? `<div class="paper-section"><h4>Method</h4><p>${highlightedMethod}</p></div>` : ''}
         ${paper.result ? `<div class="paper-section"><h4>Result</h4><p>${highlightedResult}</p></div>` : ''}
         ${paper.conclusion ? `<div class="paper-section"><h4>Conclusion</h4><p>${highlightedConclusion}</p></div>` : ''}
+        ${newFieldSecs.join('')}
       </div>
+      ${metaLine}
       
       ${highlightedAbstract ? `<h3>Abstract</h3><p class="original-abstract">${highlightedAbstract}</p>` : ''}
       

@@ -1769,6 +1769,51 @@ footer {
   border: 1px solid rgba(255, 215, 0, 0.25);
 }
 
+/* ===== 新分类体系徽章（research_focus.yaml）===== */
+.category-tag.tax-tag {
+  background-color: rgba(102, 126, 234, 0.12);
+  color: var(--primary-color, #667eea);
+  font-weight: 600;
+  border: 1px solid rgba(102, 126, 234, 0.25);
+}
+
+.tier-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-left: 6px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.tier-badge.tier-must_read {
+  background-color: #e74c3c;
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(231, 76, 60, 0.4);
+}
+.tier-badge.tier-key {
+  background-color: #f39c12;
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(243, 156, 18, 0.4);
+}
+.tier-badge.tier-candidate {
+  background-color: #3498db;
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(52, 152, 219, 0.4);
+}
+
+.paper-meta-line {
+  font-size: 13px;
+  color: var(--text-secondary, #555);
+  padding: 8px 0;
+  border-top: 1px dashed var(--border-color, #e0e0e0);
+  margin-top: 4px;
+}
+.paper-meta-line a {
+  color: var(--primary-color, #667eea);
+  word-break: break-all;
+}
+
 /* 添加一个高亮动画效果 */
 @keyframes highlightPulse {
   0% {

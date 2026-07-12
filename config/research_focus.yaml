@@ -1,0 +1,388 @@
+# =============================================================================
+# research_focus.yaml  —  SINGLE SOURCE OF TRUTH
+# -----------------------------------------------------------------------------
+# daily-arXiv-ai-enhanced
+#
+# 本文件集中维护“研究定位 / 抓取分类 / 关键词分层 / 降权规则 / 分类映射 /
+# 打分方法 / 每日输出分层”。scorer.py、filter.py、RESEARCH_FOCUS.md 与
+# 前端说明都从本文件派生。修改研究方向时，优先改这里，避免关键词、Prompt、
+# 前端和工作流彼此不一致。
+#
+# 最后更新：2026-07-12
+# =============================================================================
+
+research:
+  # 页面副标题 / README 一句话定位
+  title: "带宽受限边缘集群大模型分布式推理论文雷达"
+  # 一句话定位
+  positioning: >-
+    面向“带宽受限、多节点边缘集群中的大模型分布式推理”的论文情报系统。
+    目标不是尽量多抓论文，而是每天选出真正可能影响实验设计、研究问题和源码学习的少量论文。
+  # 当前实验载体
+  platform: >-
+    地面 7×NVIDIA Jetson Thor；节点之间无 NVLink；重点考虑普通以太网 / 25GbE
+    等受限互联；太空在轨分布式计算是长期应用延伸，不是近期唯一关键词。
+  # 研究推进顺序 A→B→C（仅用于 LLM 判断“对应 A/B/C 哪一项”，不强制主类别优先级）
+  paths:
+    A: "系统测量与瓶颈分析（TP/PP/混合并行；吞吐、TTFT、TPOT、尾延迟、能效；内存带宽、网络带宽、通信占比；扩展规律）"
+    B: "通信感知的分区与调度（communication-aware partitioning；TP/PP 选择与混合；activation compression；compute-communication overlap；KV cache 迁移/卸载/分层；prefill/decode disaggregation）"
+    C: "容错与弹性恢复（节点失效；链路中断或带宽骤降；straggler；模型分区重映射；请求恢复；低通信/迁移开销的服务恢复）"
+
+# -----------------------------------------------------------------------------
+# 1. arXiv 抓取分类
+#    同时设置本文件的 categories，以及 GitHub repo variable CATEGORIES
+#    （run.yml 在 CI 中读取 vars.CATEGORIES 注入爬虫；本地 dry run 用环境变量
+#    CATEGORIES）。两者必须保持一致。
+#    支持 new + cross-list；按 arXiv ID 去重；同一论文只保留最新版本。
+#    若只能配置有限分类，优先级：cs.DC > cs.AR > cs.PF > cs.NI > cs.OS > cs.LG > cs.ET
+# -----------------------------------------------------------------------------
+categories:
+  # 核心分类：全部进入摘要阶段（数量可控）
+  core:
+    - cs.DC   # Distributed, Parallel, and Cluster Computing
+    - cs.AR   # Hardware Architecture
+    - cs.PF   # Performance
+    - cs.NI   # Networking and Internet Architecture
+    - cs.OS   # Operating Systems
+  # 支撑分类：数量很大，必须先经关键词/语义筛选，命中才进入摘要阶段
+  support:
+    - cs.LG   # Machine Learning
+    - cs.ET   # Emerging Technologies
+  # 抓取优先级（仅在分类额度受限时使用）
+  priority: [cs.DC, cs.AR, cs.PF, cs.NI, cs.OS, cs.LG, cs.ET]
+
+# -----------------------------------------------------------------------------
+# 2. 关键词分层（权重用于打分；P0 使用“概念交集”而非单关键词命中）
+#    匹配范围：title + summary（abstract）
+# -----------------------------------------------------------------------------
+keywords:
+
+  # ---- P0：研究交集（最高优先级，命中即强制保留） ----
+  # 规则：单独命中 distributed / edge / inference / serving 等“宽词”不算 P0，
+  #       必须形成有意义组合（见 patterns）。命中任一有效组合 → +8 且强制保留。
+  p0_intersection:
+    weight: 8
+    # 有效交集模式（列表中任一组词同时出现即算命中；大小写不敏感，子串匹配）
+    patterns:
+      - ["distributed", "inference"]
+      - ["distributed", "serving"]
+      - ["multi-node", "LLM"]
+      - ["edge", "LLM"]
+      - ["edge", "inference"]
+      - ["edge", "LLM serving"]
+      - ["low-bandwidth", "inference"]
+      - ["bandwidth-constrained", "inference"]
+      - ["communication-efficient", "inference"]
+      - ["model parallelism", "communication"]
+      - ["tensor parallelism", "communication"]
+      - ["pipeline parallelism", "communication"]
+      - ["LLM serving", "interconnect"]
+      - ["LLM serving", "network bottleneck"]
+      - ["Jetson", "cluster"]
+      - ["Jetson Thor", "inference"]
+    # 这些“宽词”单独命中不计 P0（防止误命中）
+    ignore_standalone:
+      - distributed
+      - edge
+      - inference
+      - serving
+      - model
+      - parallel
+      - cluster
+      - LLM
+
+  # ---- P1：候选贡献 B/C（通信感知分区/调度 + 容错弹性） ----
+  p1_bc:
+    weight: 5
+    # B-通信与调度
+    comm_scheduling:
+      - communication-aware partitioning
+      - model partitioning
+      - pipeline scheduling
+      - communication overlap
+      - activation compression
+      - KV cache migration
+      - KV cache offloading
+      - distributed KV cache
+      - disaggregated serving
+      - prefill decode disaggregation
+    # C-容错与弹性
+    fault_tolerance:
+      - fault-tolerant inference
+      - elastic inference
+      - failure recovery
+      - node failure
+      - link failure
+      - link degradation
+      - straggler mitigation
+      - model repartitioning
+      - fault-aware scheduling
+      - request recovery
+      - service recovery
+      - redundancy
+      - checkpointing for inference
+
+  # ---- P2：AI Infra 与推理引擎 ----
+  p2_infra:
+    weight: 2
+    keywords:
+      - vLLM
+      - SGLang
+      - PagedAttention
+      - RadixAttention
+      - continuous batching
+      - inference scheduler
+      - LLM serving
+      - inference engine
+      - Ray distributed
+      - TensorRT-LLM
+      - speculative decoding
+      - chunked prefill
+      - prefix caching
+      - MoE serving
+      - memory management
+      - GPU memory
+      - inference orchestration
+
+  # ---- P3：体系结构 / 硬件副线（命中需通过 arch_llm_gate 才进高优先级） ----
+  p3_arch:
+    weight: 2
+    keywords:
+      - AI accelerator
+      - GPU architecture
+      - NPU
+      - memory bandwidth
+      - memory hierarchy
+      - interconnect
+      - NoC
+      - HBM
+      - LPDDR
+      - roofline
+      - kernel fusion
+      - CUDA
+      - Triton
+      - FlashAttention
+      - quantization
+      - sparsity
+      - processing-in-memory
+      - PIM
+      - chiplet
+      - RISC-V
+      - systolic array
+
+  # ---- P4：太空场景（辅助，不单独置顶） ----
+  p4_space:
+    weight: 1
+    keywords:
+      - space computing
+      - on-orbit inference
+      - satellite edge computing
+      - LEO edge computing
+      - orbital edge computing
+      - fault-tolerant space computing
+      - radiation-tolerant computing
+      - satellite computing network
+
+# -----------------------------------------------------------------------------
+# 3. 降权与排除
+#    命中 weak_keywords 且无 system_exception 贡献 → 按 penalties 降权。
+#    例外：若同时命中 system_exception_keywords 之一，则不降权（保留系统贡献）。
+# -----------------------------------------------------------------------------
+downweight:
+  weak_keywords:
+    - VLA
+    - vision-language-action
+    - embodied intelligence
+    - robot manipulation
+    - pure robotics
+    - autonomous driving perception
+    - pure multimodal benchmark
+    - pure NLP benchmark
+    - recommendation system
+    - medical application
+    - pure model architecture
+    - pure fine-tuning
+    - pure training optimization
+    - pure distributed training
+    - pure federated learning
+    - pure task offloading
+    - survey
+  penalties:
+    pure_vla_robotics: -6      # 纯 VLA / 机器人算法，无系统贡献
+    pure_training_optimization: -4
+    pure_model_precision: -5   # 纯模型精度改进
+    pure_task_offloading: -3
+    survey: -2
+    space_only_no_system: 0    # 仅命中太空词（已在 p4 weight=1 处理，这里明确不加分）
+  # 例外：命中以下系统贡献关键词之一 → 不降权
+  system_exception_keywords:
+    - system
+    - kernel
+    - inference engine
+    - scheduler
+    - communication
+    - distributed
+    - fault
+    - hardware
+    - architecture
+    - benchmark
+    - throughput
+    - latency
+    - bandwidth
+    - parallel
+    - serving
+
+# -----------------------------------------------------------------------------
+# 4. 体系结构副线门控（P3 命中需同时涉及以下至少一项才进高优先级）
+# -----------------------------------------------------------------------------
+arch_llm_gate:
+  - LLM inference
+  - memory bottleneck
+  - interconnect bottleneck
+  - distributed execution
+  - inference kernel
+  - system performance
+  - Jetson
+  - Thor
+  - edge device
+
+# -----------------------------------------------------------------------------
+# 5. 强相关系统 / 引擎（额外加分）
+# -----------------------------------------------------------------------------
+strong_systems:
+  weight: 4
+  keywords:
+    - vLLM
+    - SGLang
+    - NCCL
+    - Megatron
+    - Ray
+
+# -----------------------------------------------------------------------------
+# 6. 复现性 / 硬件 / 结果 加分项
+# -----------------------------------------------------------------------------
+bonuses:
+  open_source:
+    weight: 2
+    indicators:
+      - github.com
+      - code available
+      - open-source
+  hardware_benchmark:
+    weight: 3
+    indicators:
+      - Jetson
+      - Thor
+      - A100
+      - H100
+      - bandwidth
+      - ethernet
+      - 25GbE
+      - interconnect
+      - benchmark
+      - TTFT
+      - TPOT
+      - throughput
+      - latency
+  explicit_result:
+    weight: 2
+    indicators:
+      - throughput
+      - latency
+      - TTFT
+      - TPOT
+      - bandwidth
+      - communication
+      - energy
+      - recovery time
+      - speedup
+
+# -----------------------------------------------------------------------------
+# 7. 分类映射（主类别 + 副标签）
+#    每篇保留下来的论文必须归入以下一个主类别：
+#      A-测量与瓶颈 / B-通信与调度 / C-容错与弹性 /
+#      Infra-推理引擎 / Arch-体系结构 / Space-场景延伸 / Background-支撑
+#    命中多个时选“与我当前研究最直接的一个”作主类别，其余作副标签。
+#    主类别判定优先级（在 scorer.py 中实现）：
+#      C > B > A > Infra > Arch > Space > Background
+# -----------------------------------------------------------------------------
+classification:
+  main_categories: [A, B, C, Infra, Arch, Space, Background]
+  display_names:
+    A: "A-测量与瓶颈"
+    B: "B-通信与调度"
+    C: "C-容错与弹性"
+    Infra: "Infra-推理引擎"
+    Arch: "Arch-体系结构"
+    Space: "Space-场景延伸"
+    Background: "Background-支撑"
+  # 各主类别对应的关键词（用于 scorer 判定）
+  rules:
+    A:                            # 测量 / 瓶颈 / 扩展
+      - throughput
+      - TTFT
+      - TPOT
+      - tail latency
+      - energy efficiency
+      - scaling law
+      - scaling efficiency
+      - benchmark
+      - roofline
+      - memory bandwidth
+      - network bandwidth
+      - communication volume
+    B:                            # 通信与调度
+      comm_scheduling: true       # 命中 p1_bc.comm_scheduling 任一
+    C:                            # 容错与弹性
+      fault_tolerance: true       # 命中 p1_bc.fault_tolerance 任一
+    Infra:                        # 推理引擎
+      - vLLM
+      - SGLang
+      - PagedAttention
+      - RadixAttention
+      - continuous batching
+      - inference scheduler
+      - LLM serving
+      - inference engine
+      - TensorRT-LLM
+      - speculative decoding
+      - chunked prefill
+      - prefix caching
+      - MoE serving
+      - inference orchestration
+    Arch:                         # 体系结构（且通过 arch_llm_gate）
+      arch_layer: true            # 命中 p3_arch 且通过门控
+    Space:                        # 太空场景（且无系统贡献）
+      space_layer: true           # 仅命中 p4_space
+    Background:                   # 其余相关
+
+# -----------------------------------------------------------------------------
+# 8. 评分上限（防关键词堆叠导致错误排序）
+# -----------------------------------------------------------------------------
+score_caps:
+  max_p0: 8                  # P0 有效交集至多计一次（命中即 +8）
+  max_p1_hits: 8              # P1 不同关键词最多计 8 个
+  max_p2_hits: 6
+  max_p3_hits: 4
+  max_p4_hits: 2
+  max_strong_system_hits: 2
+  max_total_keyword_score: 45  # 关键词相关总分上限（不含 bonus）
+
+# -----------------------------------------------------------------------------
+# 9. 每日输出分层
+# -----------------------------------------------------------------------------
+output:
+  key_papers: 5          # 今日重点：最多 5 篇，真正值得打开查看
+  candidate_papers: 12   # 今日候选：最多 12 篇，相关但不一定立即精读
+  must_read: 2           # 建议精读：最多 2 篇，须满足 deep_read_rules
+  hard_score_threshold: -100   # 低于此分直接丢弃（纯噪声）
+
+# -----------------------------------------------------------------------------
+# 10. 建议精读规则（filter.py 用，基于 scorer 输出，无需 LLM）
+#     满足以下全部条件方可进入“建议精读”：
+# -----------------------------------------------------------------------------
+must_read_rules:
+  require_main_category: [A, B, C]            # 直接对应 A/B/C
+  require_reproducible: true                  # 有开源代码（open_source 指示命中）
+  require_system_or_lowbandwidth: true        # 命中 low-bandwidth / multi-node / fault / p1_bc
+  min_score: 10                               # 基础分门槛
