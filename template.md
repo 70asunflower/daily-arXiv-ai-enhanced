@@ -1,12 +1,12 @@
 # About
 This tool will daily crawl https://arxiv.org and use LLMs to summarize them.
 
-See in: https://dw-dengwei.github.io/daily-arXiv-ai-enhanced/
+See in: https://70asunflower.github.io/daily-arXiv-ai-enhanced/
 
 # How to use
-This repo will daily crawl arXiv papers about **cs.CV, cs.GR and cs.CL**, and use **DeepSeek** to summarize the papers in **Chinese**.
+This repo is a paper-radar for **bandwidth-constrained, multi-node edge-cluster LLM distributed inference**. It daily crawls arXiv categories **cs.DC, cs.AR, cs.PF, cs.NI, cs.OS** (core) plus **cs.LG, cs.ET** (support, keyword-filtered), and uses **DeepSeek** to produce structured Chinese intelligence reports.
 If you wish to crawl other arXiv categories, use other LLMs or other languages, please follow the bellow instructions.
-Otherwise, you can directly use this repo in https://dw-dengwei.github.io/daily-arXiv-ai-enhanced/ . Please star it if you like :)
+Otherwise, you can directly use this repo in https://70asunflower.github.io/daily-arXiv-ai-enhanced/ . Please star it if you like :)
 
 **Instructions:**
 1. Fork this repo to your own account
@@ -15,7 +15,7 @@ Otherwise, you can directly use this repo in https://dw-dengwei.github.io/daily-
 4. Create two repository secrets named `OPENAI_API_KEY` and `OPENAI_BASE_URL`, and input corresponding values.
 5. Go to Variables. Variables are shown as plain text and are used for non-sensitive data
 6. Create the following repository variables:
-   1. `CATEGORIES`: separate the categories with ",", such as "cs.CL, cs.CV"
+   1. `CATEGORIES`: separate the categories with ",", such as "cs.DC, cs.AR, cs.PF, cs.NI, cs.OS, cs.LG, cs.ET"
    2. `LANGUAGE`: such as "Chinese" or "English"
    3. `MODEL_NAME`: such as "deepseek-chat"
    4. `EMAIL`: your email for push to github
@@ -39,4 +39,4 @@ You can modify it in `.github/workflows/run.yml`
 
 # Star history
 
-[![Star History Chart](https://api.star-history.com/svg?repos=dw-dengwei/daily-arXiv-ai-enhanced&type=Date)](https://www.star-history.com/#dw-dengwei/daily-arXiv-ai-enhanced&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=70asunflower/daily-arXiv-ai-enhanced&type=Date)](https://www.star-history.com/#70asunflower/daily-arXiv-ai-enhanced&Date)

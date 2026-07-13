@@ -37,7 +37,7 @@ class Structure(BaseModel):
     )
 
     # === New intelligence fields (17-field report) ===
-    category_tag: str = Field(
+    ai_category_tag: str = Field(
         default="Background-支撑",
         description="主类别（由 scorer 输入，取值之一：A-测量与瓶颈 / B-通信与调度 / "
                     "C-容错与弹性 / Infra-推理引擎 / Arch-体系结构 / Space-场景延伸 / Background-支撑）",

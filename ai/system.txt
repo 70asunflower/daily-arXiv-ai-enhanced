@@ -18,7 +18,7 @@
 3. method：系统/硬件论文必须写明硬件平台（Jetson Thor / A100 / H100 / FPGA / ASIC）、关键技术（通信压缩 / 分区 / overlap / KV 迁移 / 量化）、实现层级（算子 / 编译 / 系统）。2-3 句。
 4. result：关键结果总括——吞吐、TTFT、TPOT、尾延迟、带宽、通信量、扩展效率、能效、恢复时间；必须给出对比基线与测量口径。禁止"性能提升"这类空话。
 5. conclusion：1 句结论或 takeaway。
-6. category_tag：沿用输入给定的主类别（A-测量与瓶颈 / B-通信与调度 / C-容错与弹性 / Infra-推理引擎 / Arch-体系结构 / Space-场景延伸 / Background-支撑）。不要自行修改。
+6. ai_category_tag：沿用输入给定的主类别（A-测量与瓶颈 / B-通信与调度 / C-容错与弹性 / Infra-推理引擎 / Arch-体系结构 / Space-场景延伸 / Background-支撑）。不要自行修改。
 7. sub_tags：副标签，逗号分隔的短代码（如 B,Arch）；多类别命中时的次要类别，没有则留空。
 8. problem：比 motivation 更聚焦实验/系统层面的 gap。
 9. hardware：系统与硬件环境——节点数、GPU/加速器型号、互联（以太网 / 25GbE / 有无 NVLink）、内存/带宽配置。摘要未明确写"论文摘要未明确"。

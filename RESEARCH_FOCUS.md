@@ -76,6 +76,11 @@
 
 前端按 `tier` 显示徽章并排序（建议精读 > 今日重点 > 今日候选）。
 
+> **注意（deep_read 与 tier 是两个独立信号）**：卡片/Markdown 里出现的 `建议精读` 徽章（规则判定，`tier=must_read`）与 LLM 字段 `deep_read`（AI 判断）**口径不同、可能不一致**，二者均会标注，看到矛盾属正常、不是 bug：
+> - `tier=must_read`：由 `filter.py` 按硬规则判定（主类别 ∈ {A,B,C} 且 有开源 且 系统/低带宽相关 且 分数 ≥ 阈值）。
+> - `deep_read`：由 LLM 按 A/B/C + 开源 + 显著结果 + 对 7×Thor 价值 综合判断。
+> 若想调整 must_read 门槛，改 `config/research_focus.yaml` 的 `must_read_rules`；若想调整 AI 建议精读，改 `ai/system.txt` 第 6 节口径。
+
 ## 8. LLM 摘要（17 字段情报）
 
 `ai/system.txt` + `ai/template.txt` 驱动 `ai/enhance.py`，结构化输出由
