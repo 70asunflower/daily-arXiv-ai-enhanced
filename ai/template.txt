@@ -7,3 +7,5 @@
 
 摘要原文：
 {content}
+
+【输出格式要求】你必须且只能输出一个合法的 JSON 对象，不要输出任何多余文字、解释或 markdown 代码块。JSON 对象的键名严格使用系统提示中列出的英文键名：tldr、motivation、method、result、conclusion、ai_category_tag、sub_tags、pillar、problem、hardware、comm_mechanism、memory_kv、key_results、baseline、measurement、abc_tag、value_7xthor、infra_assumption、nvlink_free_holds、differentiation、deep_read、deep_read_reason、open_source（其中 deep_read 为布尔值 true/false）。
