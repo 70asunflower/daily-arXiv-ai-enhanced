@@ -10,14 +10,17 @@
     <title>边缘集群分布式推理论文雷达 | Daily arXiv</title>
     <link rel="icon" type="image/png" href="assets/logo2-removebg-preview.png">
     <link rel="shortcut icon" type="image/png" href="assets/logo2-removebg-preview.png">
-    <link rel="stylesheet" href="css/styles.css?v=3">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <link rel="stylesheet" href="css/styles.css?v=4">
+    <!-- Google Fonts: 非渲染阻塞加载，CDN 不可达时自动回退系统字体，避免白屏 -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"></noscript>
+    <!-- flatpickr 本地自托管（去掉 jsdelivr CDN 依赖，避免国内网络屏蔽导致页面卡死） -->
+    <link rel="stylesheet" href="assets/flatpickr.min.css?v=1">
+    <script src="assets/flatpickr.min.js?v=1"></script>
 
     <!-- Authentication Scripts -->
-    <script src="js/auth-config.js?v=3"></script>
-    <script src="js/auth.js?v=3"></script>
+    <script src="js/auth-config.js?v=4"></script>
+    <script src="js/auth.js?v=4"></script>
     <!-- Data Source Configuration (inlined to avoid cache issues with data-config.js) -->
     <script>
     const DATA_CONFIG = {
