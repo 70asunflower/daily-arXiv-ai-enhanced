@@ -21,6 +21,7 @@ from langchain.prompts import (
     HumanMessagePromptTemplate,
 )
 from structure import Structure
+from pydantic import ValidationError
 
 if os.path.exists('.env'):
     dotenv.load_dotenv()
@@ -33,6 +34,68 @@ def parse_args():
     parser.add_argument("--data", type=str, required=True, help="jsonline data file")
     parser.add_argument("--max_workers", type=int, default=1, help="Maximum number of parallel workers")
     return parser.parse_args()
+
+# 结构化输出失败时使用的默认值（必须匹配 structure.py 的 20 字段 schema）
+DEFAULT_AI_FIELDS = {
+    "tldr": "摘要生成失败",
+    "motivation": "研究问题分析不可用",
+    "method": "方法提取失败",
+    "result": "结果分析不可用",
+    "conclusion": "结论提取失败",
+    "ai_category_tag": "",
+    "sub_tags": "",
+    "pillar": "Background",
+    "problem": "论文摘要未明确",
+    "hardware": "论文摘要未明确",
+    "comm_mechanism": "论文摘要未明确",
+    "memory_kv": "论文摘要未明确",
+    "key_results": "论文摘要未明确",
+    "baseline": "论文摘要未明确",
+    "measurement": "论文摘要未明确",
+    "abc_tag": "",
+    "value_7xthor": "论文摘要未明确",
+    "infra_assumption": "论文摘要未明确",
+    "nvlink_free_holds": "论文摘要未明确",
+    "differentiation": "论文摘要未明确",
+    "deep_read": False,
+    "deep_read_reason": "AI 处理失败",
+    "open_source": "未公开",
+}
+
+def _repair_and_parse(raw: str):
+    """尽力把模型返回的（可能不规范的）JSON 文本解析成 dict。"""
+    if not raw:
+        return None
+    s = raw.strip()
+    # 去掉 ```json ... ``` 代码围栏
+    m = re.search(r"```(?:json)?\s*(.*?)```", s, re.DOTALL)
+    if m:
+        s = m.group(1).strip()
+    # 截取最外层 {}
+    start = s.find("{")
+    end = s.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        s = s[start:end + 1]
+    # 去除尾随逗号
+    s = re.sub(r",\s*([}\]])", r"\1", s)
+    for cand in (s, s.replace("\n", " ").replace("\r", " ").replace("\t", " ")):
+        try:
+            obj = json.loads(cand)
+            if isinstance(obj, dict):
+                return obj
+        except Exception:
+            continue
+    return None
+
+def _coerce_field(name: str, value):
+    """对个别字段做类型纠正（主要是 deep_read 的 bool）。"""
+    if name == "deep_read":
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.strip().lower() in ("true", "1", "yes", "是")
+        return bool(value)
+    return value
 
 def process_single_item(chain, item: Dict, language: str) -> Dict:
     def is_sensitive(content: str) -> bool:
@@ -103,105 +166,78 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
     if code_info:
         item.update(code_info)
 
-    """处理单个数据项"""
-    # Default structure with meaningful fallback values (must match
-    # ai/structure.py 17-field schema so downstream convert.py / frontend
-    # never KeyError on a failed/partial LLM response).
-    default_ai_fields = {
-        "tldr": "摘要生成失败",
-        "motivation": "研究问题分析不可用",
-        "method": "方法提取失败",
-        "result": "结果分析不可用",
-        "conclusion": "结论提取失败",
-        "ai_category_tag": "",
-        "sub_tags": "",
-        "pillar": "Background",
-        "problem": "论文摘要未明确",
-        "hardware": "论文摘要未明确",
-        "comm_mechanism": "论文摘要未明确",
-        "memory_kv": "论文摘要未明确",
-        "key_results": "论文摘要未明确",
-        "baseline": "论文摘要未明确",
-        "measurement": "论文摘要未明确",
-        "abc_tag": "",
-        "value_7xthor": "论文摘要未明确",
-        "infra_assumption": "论文摘要未明确",
-        "nvlink_free_holds": "论文摘要未明确",
-        "differentiation": "论文摘要未明确",
-        "deep_read": False,
-        "deep_read_reason": "AI 处理失败",
-        "open_source": "未公开",
+    """处理单个数据项 —— 调用 LLM（json_mode 结构化输出），失败时尽力修复 JSON / 重试"""
+    invoke_kwargs = {
+        "language": language,
+        "category_tag": item.get("category_tag", "Background-支撑"),
+        "pillar": item.get("pillar", "Background"),
+        "matched_keywords": ", ".join(item.get("matched_keywords", [])),
+        "score": f"{item.get('score', 0):.1f}",
+        "content": item['summary'],
     }
-    
-    try:
-        response: Structure = chain.invoke({
-            "language": language,
-            "category_tag": item.get("category_tag", "Background-支撑"),
-            "pillar": item.get("pillar", "Background"),
-            "matched_keywords": ", ".join(item.get("matched_keywords", [])),
-            "score": f"{item.get('score', 0):.1f}",
-            "content": item['summary']
-        })
-        item['AI'] = response.model_dump()
-    except langchain_core.exceptions.OutputParserException as e:
-        # 尝试从错误信息中提取 JSON 字符串并修复
-        error_msg = str(e)
-        partial_data = {}
-        
-        if "Function Structure arguments:" in error_msg:
-            try:
-                # 提取 JSON 字符串
-                json_str = error_msg.split("Function Structure arguments:", 1)[1].strip().split('are not valid JSON')[0].strip()
-                # 预处理 LaTeX 数学符号 - 使用四个反斜杠来确保正确转义
-                json_str = json_str.replace('\\', '\\\\')
-                # 尝试解析修复后的 JSON
-                partial_data = json.loads(json_str)
-            except Exception as json_e:
-                print(f"Failed to parse JSON for {item.get('id', 'unknown')}: {json_e}", file=sys.stderr)
-        
-        # Merge partial data with defaults to ensure all fields exist
-        item['AI'] = {**default_ai_fields, **partial_data}
-        print(f"Using partial AI data for {item.get('id', 'unknown')}: {list(partial_data.keys())}", file=sys.stderr)
-    except Exception as e:
-        # Catch any other exceptions and provide default values
-        print(f"Unexpected error for {item.get('id', 'unknown')}: {e}", file=sys.stderr)
-        item['AI'] = default_ai_fields
-    
-    # Final validation to ensure all required fields exist
-    for field in default_ai_fields.keys():
-        if field not in item['AI']:
-            item['AI'][field] = default_ai_fields[field]
+    messages = prompt_template.format_prompt(**invoke_kwargs).to_messages()
 
-    # 检查 AI 生成的所有字段
+    item['AI'] = dict(DEFAULT_AI_FIELDS)
+    last_err = None
+    for attempt in range(3):
+        try:
+            raw = llm.invoke(messages).content
+            parsed = _repair_and_parse(raw)
+            if not parsed:
+                last_err = f"attempt {attempt+1}: empty/invalid JSON"
+                continue
+            try:
+                response = Structure(**parsed)
+                item['AI'] = response.model_dump()
+                break
+            except ValidationError as ve:
+                # 部分字段可用：用默认值补齐缺失项
+                merged = dict(DEFAULT_AI_FIELDS)
+                for k, v in parsed.items():
+                    if k in DEFAULT_AI_FIELDS:
+                        merged[k] = _coerce_field(k, v)
+                item['AI'] = merged
+                print(f"Partial AI data for {item.get('id','unknown')}: {list(parsed.keys())}", file=sys.stderr)
+                break
+        except Exception as e:
+            last_err = f"attempt {attempt+1}: {e}"
+            continue
+    else:
+        print(f"All attempts failed for {item.get('id','unknown')}: {last_err}", file=sys.stderr)
+
+    # 最终校验：所有字段存在且非空
+    for field in DEFAULT_AI_FIELDS.keys():
+        if field not in item['AI'] or item['AI'][field] in (None, ""):
+            item['AI'][field] = DEFAULT_AI_FIELDS[field]
+
+    # 检查 AI 生成的所有字段（敏感词）
     for v in item.get("AI", {}).values():
         if is_sensitive(str(v)):
             return None
     return item
 
 def process_all_items(data: List[Dict], model_name: str, language: str, max_workers: int) -> List[Dict]:
-    """并行处理所有数据项"""
+    """并行处理所有数据项（json_mode 结构化输出 + 重试 + JSON 修复）"""
     llm = ChatOpenAI(
         model=model_name,
-        model_kwargs={"extra_body": {"thinking": {"type": "disabled"}}}
-    ).with_structured_output(Structure, method="function_calling")
-    print('Connect to:', model_name, file=sys.stderr)
-    
+        model_kwargs={"extra_body": {"thinking": {"type": "disabled"}}},
+        temperature=0,
+    ).bind(response_format={"type": "json_object"})
+    print('Connect to:', model_name, '(json_mode)', file=sys.stderr)
+
     prompt_template = ChatPromptTemplate.from_messages([
         SystemMessagePromptTemplate.from_template(system),
         HumanMessagePromptTemplate.from_template(template=template)
     ])
 
-    chain = prompt_template | llm
-    
-    # 使用线程池并行处理
     processed_data = [None] * len(data)  # 预分配结果列表
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # 提交所有任务
         future_to_idx = {
-            executor.submit(process_single_item, chain, item, language): idx
+            executor.submit(process_single_item, llm, prompt_template, item, language): idx
             for idx, item in enumerate(data)
         }
-        
+
         # 使用tqdm显示进度
         for future in tqdm(
             as_completed(future_to_idx),
@@ -216,32 +252,8 @@ def process_all_items(data: List[Dict], model_name: str, language: str, max_work
                 print(f"Item at index {idx} generated an exception: {e}", file=sys.stderr)
                 # Add default AI fields to ensure consistency
                 processed_data[idx] = data[idx]
-                processed_data[idx]['AI'] = {
-                    "tldr": "AI 处理失败",
-                    "motivation": "AI 处理失败",
-                    "method": "AI 处理失败",
-                    "result": "AI 处理失败",
-                    "conclusion": "AI 处理失败",
-                    "ai_category_tag": data[idx].get("category_tag", ""),
-                    "sub_tags": "",
-                    "pillar": data[idx].get("pillar", "Background"),
-                    "problem": "论文摘要未明确",
-                    "hardware": "论文摘要未明确",
-                    "comm_mechanism": "论文摘要未明确",
-                    "memory_kv": "论文摘要未明确",
-                    "key_results": "论文摘要未明确",
-                    "baseline": "论文摘要未明确",
-                    "measurement": "论文摘要未明确",
-                    "abc_tag": "",
-                    "value_7xthor": "论文摘要未明确",
-                    "infra_assumption": "论文摘要未明确",
-                    "nvlink_free_holds": "论文摘要未明确",
-                    "differentiation": "论文摘要未明确",
-                    "deep_read": False,
-                    "deep_read_reason": "AI 处理失败",
-                    "open_source": "未公开",
-                }
-    
+                processed_data[idx]['AI'] = dict(DEFAULT_AI_FIELDS)
+
     return processed_data
 
 def main():
