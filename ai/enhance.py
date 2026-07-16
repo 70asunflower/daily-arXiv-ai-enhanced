@@ -13,13 +13,7 @@ import dotenv
 import argparse
 from tqdm import tqdm
 
-import langchain_core.exceptions
-from langchain_openai import ChatOpenAI
-from langchain.prompts import (
-    ChatPromptTemplate,
-    SystemMessagePromptTemplate,
-    HumanMessagePromptTemplate,
-)
+from openai import OpenAI
 from structure import Structure
 from pydantic import ValidationError
 
@@ -97,7 +91,7 @@ def _coerce_field(name: str, value):
         return bool(value)
     return value
 
-def process_single_item(chain, item: Dict, language: str) -> Dict:
+def process_single_item(client, item: Dict, language: str, model_name: str) -> Dict:
     def is_sensitive(content: str) -> bool:
         """
         [DISABLED] 原先调用 spam.dw-dengwei.workers.dev 做敏感词检测。
@@ -117,21 +111,21 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
         # 1. 优先匹配 github.com/owner/repo 格式
         github_pattern = r"https?://github\.com/([a-zA-Z0-9-_]+)/([a-zA-Z0-9-_\.]+)"
         match = re.search(github_pattern, content)
-        
+
         if match:
             owner, repo = match.groups()
             # 清理 repo 名称，去掉可能的 .git 后缀或末尾的标点
             repo = repo.rstrip(".git").rstrip(".,)")
-            
+
             full_url = f"https://github.com/{owner}/{repo}"
             code_info["code_url"] = full_url
-            
+
             # 尝试调用 GitHub API 获取信息
             github_token = os.environ.get("TOKEN_GITHUB")
             headers = {"Accept": "application/vnd.github.v3+json"}
             if github_token:
                 headers["Authorization"] = f"token {github_token}"
-            
+
             try:
                 api_url = f"https://api.github.com/repos/{owner}/{repo}"
                 resp = requests.get(api_url, headers=headers, timeout=5)
@@ -147,14 +141,14 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
         # 2. 如果没有 github.com，尝试匹配 github.io
         github_io_pattern = r"https?://[a-zA-Z0-9-_]+\.github\.io(?:/[a-zA-Z0-9-_\.]+)*"
         match_io = re.search(github_io_pattern, content)
-        
+
         if match_io:
             url = match_io.group(0)
             # 清理末尾标点
             url = url.rstrip(".,)")
             code_info["code_url"] = url
             # github.io 不进行 star 和 update 判断
-                
+
         return code_info
 
     # 检查 summary 字段
@@ -166,22 +160,35 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
     if code_info:
         item.update(code_info)
 
-    """处理单个数据项 —— 调用 LLM（json_mode 结构化输出），失败时尽力修复 JSON / 重试"""
-    invoke_kwargs = {
-        "language": language,
-        "category_tag": item.get("category_tag", "Background-支撑"),
-        "pillar": item.get("pillar", "Background"),
-        "matched_keywords": ", ".join(item.get("matched_keywords", [])),
-        "score": f"{item.get('score', 0):.1f}",
-        "content": item['summary'],
-    }
-    messages = prompt_template.format_prompt(**invoke_kwargs).to_messages()
+    """处理单个数据项 —— 直接调用 OpenAI 兼容 SDK（json_mode 结构化输出），失败时尽力修复 JSON / 重试"""
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": template.format(
+            category_tag=item.get("category_tag", "Background-支撑"),
+            pillar=item.get("pillar", "Background"),
+            matched_keywords=", ".join(item.get("matched_keywords", [])),
+            score=f"{item.get('score', 0):.1f}",
+            content=item['summary'],
+        )},
+    ]
 
     item['AI'] = dict(DEFAULT_AI_FIELDS)
     last_err = None
     for attempt in range(3):
         try:
-            raw = llm.invoke(messages).content
+            resp = client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                response_format={"type": "json_object"},
+                temperature=0,
+                max_tokens=2048,
+                extra_body={"thinking": {"type": "disabled"}},
+            )
+            msg = resp.choices[0].message
+            raw = msg.content or ""
+            # 兜底：部分推理模型把 JSON 塞进 reasoning_content
+            if not raw and getattr(msg, "reasoning_content", None):
+                raw = msg.reasoning_content or ""
             parsed = _repair_and_parse(raw)
             if not parsed:
                 last_err = f"attempt {attempt+1}: empty/invalid JSON"
@@ -217,24 +224,18 @@ def process_single_item(chain, item: Dict, language: str) -> Dict:
     return item
 
 def process_all_items(data: List[Dict], model_name: str, language: str, max_workers: int) -> List[Dict]:
-    """并行处理所有数据项（json_mode 结构化输出 + 重试 + JSON 修复）"""
-    llm = ChatOpenAI(
-        model=model_name,
-        model_kwargs={"extra_body": {"thinking": {"type": "disabled"}}},
-        temperature=0,
-    ).bind(response_format={"type": "json_object"})
-    print('Connect to:', model_name, '(json_mode)', file=sys.stderr)
-
-    prompt_template = ChatPromptTemplate.from_messages([
-        SystemMessagePromptTemplate.from_template(system),
-        HumanMessagePromptTemplate.from_template(template=template)
-    ])
+    """并行处理所有数据项（openai SDK 直接调用 + json_mode + 重试 + JSON 修复）"""
+    client = OpenAI(
+        api_key=os.environ.get("OPENAI_API_KEY"),
+        base_url=os.environ.get("OPENAI_BASE_URL") or None,
+    )
+    print('Connect to:', model_name, '(openai sdk, json_mode)', file=sys.stderr)
 
     processed_data = [None] * len(data)  # 预分配结果列表
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # 提交所有任务
         future_to_idx = {
-            executor.submit(process_single_item, llm, prompt_template, item, language): idx
+            executor.submit(process_single_item, client, item, language, model_name): idx
             for idx, item in enumerate(data)
         }
 
@@ -283,7 +284,7 @@ def main():
 
     data = unique_data
     print('Open:', args.data, file=sys.stderr)
-    
+
     # 并行处理所有数据
     processed_data = process_all_items(
         data,
@@ -291,7 +292,7 @@ def main():
         language,
         args.max_workers
     )
-    
+
     # 保存结果
     with open(target_file, "w") as f:
         for item in processed_data:
