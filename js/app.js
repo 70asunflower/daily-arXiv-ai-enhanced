@@ -909,12 +909,16 @@ async function loadPapersByDate(date) {
   }
 }
 
-// ===== 新分类体系（与 config/research_focus.yaml 对齐）=====
-const TAXONOMY_ORDER = ['A', 'B', 'C', 'Infra', 'Arch', 'Space', 'Background'];
+// ===== 新分类体系（与 config/research_focus.yaml 对齐 — 11 个论文标签）=====
+const TAXONOMY_ORDER = ['Memory', 'MoE', 'Spec', 'Energy', 'C', 'B', 'A', 'Infra', 'Arch', 'Space', 'Background'];
 const TAXONOMY_TAGS = {
-  'A': 'A-测量与瓶颈',
-  'B': 'B-通信与调度',
+  'Memory': 'Memory-统一内存/KV',
+  'MoE': 'MoE-专家并行',
+  'Spec': 'Spec-MTP/投机解码',
+  'Energy': 'Energy-能效资源',
   'C': 'C-容错与弹性',
+  'B': 'B-通信与调度',
+  'A': 'A-测量与瓶颈',
   'Infra': 'Infra-推理引擎',
   'Arch': 'Arch-体系结构',
   'Space': 'Space-场景延伸',
@@ -995,13 +999,17 @@ function parseJsonlData(jsonlText, date) {
         method: ai.method || '',
         result: ai.result || '',
         conclusion: ai.conclusion || '',
-        // 新 17 字段情报
+        // 新 20 字段情报
         problem: ai.problem || '',
         hardware: ai.hardware || '',
         comm_mechanism: ai.comm_mechanism || '',
+        memory_kv: ai.memory_kv || '',
         key_results: ai.key_results || '',
         baseline: ai.baseline || '',
+        measurement: ai.measurement || '',
         abc_tag: ai.abc_tag || '',
+        pillar: paper.pillar || '',
+        sub_tags: Array.isArray(paper.sub_tags) ? paper.sub_tags.join(', ') : (paper.sub_tags || ''),
         value_7xthor: ai.value_7xthor || '',
         infra_assumption: ai.infra_assumption || '',
         nvlink_free_holds: ai.nvlink_free_holds || '',
@@ -1452,7 +1460,7 @@ function renderPapers() {
     }
     
     const tierBadge = paper.tier ? `<span class="tier-badge tier-${paper.tier}">${tierLabel(paper.tier)}</span>` : '';
-    const taxBadge = `<span class="category-tag tax-tag">${paper.taxonomyTag || paper.category}</span>`;
+    const taxBadge = `<span class="category-tag tax-tag tag-${paper.taxonomyCode || ''}">${paper.taxonomyTag || paper.category}</span>`;
     const categoryTags = taxBadge + tierBadge;
     
     // 组合需要高亮的词：关键词 + 文本搜索
@@ -1598,14 +1606,18 @@ function showPaperDetails(paper, paperIndex) {
   pushNew('Problem', paper.problem);
   pushNew('Hardware / Interconnect', paper.hardware);
   pushNew('Comm / Scheduling / Fault', paper.comm_mechanism);
+  pushNew('Memory / KV cache', paper.memory_kv);
   pushNew('Key Results', paper.key_results);
   pushNew('Baseline', paper.baseline);
+  pushNew('Measurement', paper.measurement);
   pushNew('A/B/C', paper.abc_tag);
   pushNew('Value to 7×Thor', paper.value_7xthor);
   pushNew('Infra Assumption', paper.infra_assumption);
   pushNew('Holds w/o NVLink', paper.nvlink_free_holds);
   pushNew('Differentiation', paper.differentiation);
-  const metaLine = `<p class="paper-meta-line"><strong>建议精读：</strong>${paper.deep_read ? '✅ 建议精读' : '—'}${paper.open_source ? ` &nbsp;|&nbsp; <strong>开源：</strong><a href="${paper.open_source}" target="_blank" rel="noopener">${paper.open_source}</a>` : ` &nbsp;|&nbsp; <strong>开源：</strong>未公开`}</p>`;
+  const subTagLine = paper.sub_tags ? `<p class="paper-meta-line"><strong>副标签：</strong>${paper.sub_tags}</p>` : '';
+  const pillarLine = paper.pillar ? `<p class="paper-meta-line"><strong>所属 Pillar：</strong>${paper.pillar}</p>` : '';
+  const metaLine = `${pillarLine}${subTagLine}<p class="paper-meta-line"><strong>建议精读：</strong>${paper.deep_read ? '✅ 建议精读' : '—'}${paper.open_source ? ` &nbsp;|&nbsp; <strong>开源：</strong><a href="${paper.open_source}" target="_blank" rel="noopener">${paper.open_source}</a>` : ` &nbsp;|&nbsp; <strong>开源：</strong>未公开`}</p>`;
   
   // 判断是否需要显示高亮说明
   const showHighlightLegend = activeKeywords.length > 0 || activeAuthors.length > 0;

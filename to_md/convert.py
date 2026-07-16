@@ -3,12 +3,16 @@ import argparse
 import os
 from itertools import count
 
-# 新分类体系（与 config/research_focus.yaml 对齐）
-TAXONOMY_ORDER = ['A', 'B', 'C', 'Infra', 'Arch', 'Space', 'Background']
+# 新分类体系（与 config/research_focus.yaml 对齐 — 11 个论文标签）
+TAXONOMY_ORDER = ['Memory', 'MoE', 'Spec', 'Energy', 'C', 'B', 'A', 'Infra', 'Arch', 'Space', 'Background']
 TAXONOMY_TAGS = {
-    'A': 'A-测量与瓶颈',
-    'B': 'B-通信与调度',
+    'Memory': 'Memory-统一内存/KV',
+    'MoE': 'MoE-专家并行',
+    'Spec': 'Spec-MTP/投机解码',
+    'Energy': 'Energy-能效资源',
     'C': 'C-容错与弹性',
+    'B': 'B-通信与调度',
+    'A': 'A-测量与瓶颈',
     'Infra': 'Infra-推理引擎',
     'Arch': 'Arch-体系结构',
     'Space': 'Space-场景延伸',
@@ -86,6 +90,7 @@ if __name__ == "__main__":
             tier_label = TIER_LABELS.get(tier, '')
             deep_icon = ' ✅' if ai.get('deep_read') else ''
             tldr = ai.get('tldr', '')
+            sub_tags = ', '.join(item.get('sub_tags', []) or [])
 
             markdown += template.format(
                 idx=next(idx),
@@ -95,13 +100,17 @@ if __name__ == "__main__":
                 cat=cat_tag,
                 tier=tier_label,
                 score=f"{score:.1f}",
+                pillar=item.get('pillar', ''),
+                sub_tags=sub_tags,
                 tldr=tldr + deep_icon,
                 problem=ai.get('problem', ''),
                 hardware=ai.get('hardware', ''),
                 method=ai.get('method', ''),
                 comm_mechanism=ai.get('comm_mechanism', ''),
+                memory_kv=ai.get('memory_kv', ''),
                 key_results=ai.get('key_results', ''),
                 baseline=ai.get('baseline', ''),
+                measurement=ai.get('measurement', ''),
                 abc_tag=ai.get('abc_tag', ''),
                 value_7xthor=ai.get('value_7xthor', ''),
                 infra_assumption=ai.get('infra_assumption', ''),

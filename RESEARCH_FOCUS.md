@@ -1,6 +1,6 @@
 # RESEARCH_FOCUS.md — 维护者文档
 
-> 本文件是 **daily-arXiv-ai-enhanced** 的研究定位与筛选逻辑维护说明。
+> 本文件是 **daily-arXiv-ai-enhanced** 的研究定位、四支柱与筛选逻辑维护说明。
 > 真正的“单一事实来源”是 [`config/research_focus.yaml`](./config/research_focus.yaml)，
 > 本文件解释其设计意图与修改方法；改研究方向时**优先改 yaml**，不要只改代码或 Prompt。
 
@@ -24,6 +24,8 @@
 | **B. 通信与调度** | communication-aware partitioning；TP/PP 选择与混合；activation compression；compute-communication overlap；KV cache 迁移/卸载/分层；prefill/decode disaggregation |
 | **C. 容错与弹性** | 节点失效；链路中断或带宽骤降；straggler；模型分区重映射；请求恢复；低通信/迁移开销的服务恢复 |
 
+> A/B/C 是**粗粒度度量切面**，不直接等于四支柱；论文按“主标签”归属某一支柱（见 §5）。
+
 ## 3. 抓取分类（要改这里 + GitHub Variable）
 
 来源：`research_focus.yaml → categories`，以及 **GitHub repo variable `CATEGORIES`**（CI 中读取注入爬虫）。
@@ -37,34 +39,53 @@
 > `gh variable set CATEGORIES --body "cs.DC, cs.AR, ..." --repo 70asunflower/daily-arXiv-ai-enhanced`
 > 同步 GitHub Variable。
 
-## 4. 关键词分层（P0–P4）
+## 4. 四支柱（Pillars）与标签归属
 
-| 层 | 含义 | 权重 | 说明 |
-|----|------|------|------|
-| **P0** | 研究交集（concept-intersection） | +8 且**强制保留** | 必须是“有意义组合”（见 yaml `p0_intersection.patterns`），单独命中 distributed/edge/inference 等宽词**不计** |
-| **P1** | B/C 机制（通信感知分区/调度 + 容错弹性） | +5/个 | `comm_scheduling` 与 `fault_tolerance` 两组 |
-| **P2** | AI Infra / 推理引擎 | +2/个 | vLLM/SGLang/TensorRT-LLM 等（强系统词排除避免重复计分） |
-| **P3** | 体系结构 / 硬件副线 | +2/个（需通过 `arch_llm_gate`） | 仅当同时涉及 LLM 推理/内存瓶颈/Jetson 等才进高优先级 |
-| **P4** | 太空场景 | +1/个（仅与系统层组合才计分） | 辅助，不单独置顶 |
+四支柱是研究的**关注权重**（用于排序“倾向”，不要求每天严格凑成比例）。
+每篇论文按其**主标签**落入某一支柱；支柱权重：P1 35 / P2 30 / P3 20 / P4 15。
 
-**降权 / 排除**：命中 `downweight.weak_keywords`（VLA / 机器人 / 纯训练 / 纯精度 / 纯任务卸载 / survey 等）
-且无 `system_exception_keywords` 系统贡献 → 按 `penalties` 降权（取最严重一项，不堆叠）。
+| 支柱 | 名称 | 权重 | 主标签集合 |
+|------|------|------|------------|
+| **P1** | 边缘 SoC 分布式推理与内存系统 | 35% | A-测量与瓶颈, Memory-统一内存/KV |
+| **P2** | 受限/动态网络下的通信优化与弹性恢复 | 30% | B-通信与调度, C-容错与弹性 |
+| **P3** | MoE 与分布式投机解码 | 20% | MoE-专家并行, Spec-MTP/投机解码 |
+| **P4** | 能效与资源管理 | 15% | Energy-能效资源 |
+| **Cross** | 跨支柱切面 | — | Infra-推理引擎, Arch-体系结构, Space-场景延伸 |
+| **Background** | 支撑/背景 | — | Background-支撑 |
 
-## 5. 分类映射与主类别
+## 5. 十一（11）个论文标签
 
-每篇保留下来的论文归入一个主类别，其余作副标签：
+每篇保留论文必须选 **一个主标签**，允许多个**副标签**。
 
-`A-测量与瓶颈 / B-通信与调度 / C-容错与弹性 / Infra-推理引擎 / Arch-体系结构 / Space-场景延伸 / Background-支撑`
+`Memory-统一内存/KV / MoE-专家并行 / Spec-MTP投机解码 / Energy-能效资源 /
+C-容错与弹性 / B-通信与调度 / A-测量与瓶颈 / Infra-推理引擎 / Arch-体系结构 /
+Space-场景延伸 / Background-支撑`
 
-主类别判定优先级（scorer 内）：**C > B > A > Infra > Arch > Space > Background**。
+**主标签判定优先级**（scorer 内，命中多个时取最先满足者为主标签）：
+**Memory > MoE > Spec > Energy > C > B > A > Arch > Infra > Space > Background**。
+技术细分标签（Memory/MoE/Spec/Energy）优先于粗粒度 A/B/C，以凸显研究方向；
+A/B/C 仍保留为副标签。`Infra/Arch/Space` 与 `Background` 为跨切面兜底，pillar 标为 Cross/Background。
 
-## 6. 打分与上限
+## 6. 打分规则（可解释，禁止关键词堆叠）
 
-- 强系统（vLLM/SGLang/NCCL/Megatron/Ray）：+4/个（上限 2）。
-- 加分：开源代码 +2、硬件/benchmark +3、明确结果 +2、核心 arXiv 分类 +1。
-- 防堆叠：`score_caps.max_total_keyword_score = 45`。
+来源：`research_focus.yaml → scoring` + `score_caps`。
 
-详见 `research_focus.yaml` 第 8 节。
+| 规则 | 分值 | 说明 |
+|------|------|------|
+| **P1 核心交集（concept-intersection）** | **+8 且强制保留** | 由 `pillars.P1.intersection_patterns` 判定有效组合；单独命中 distributed/edge/inference 等宽词**不计** |
+| **P2 通信优化 或 容错机制** | +5/组（comm 与 fault 各 +5） | `pillars.P2.comm_keywords` 与 `fault_keywords` 两组，分别设上限 |
+| **强系统**（vLLM/SGLang/NCCL/Megatron/Ray） | +4/个（上限 2） | `strong_systems.keywords` |
+| **硬件 + 互联 + benchmark** | +3（记一次） | `bonuses.hw_indicators` |
+| **MoE/MTP 且多节点通信/调度** | +3（记一次） | P3 关键词 + 网络/调度信号 |
+| **开源代码** | +2 | `bonuses.open_indicators` |
+| **可信系统量化结果** | +2 | `bonuses.result_indicators` |
+| **体系结构 + LLM** | +2（门控） | `bonuses.arch_gate` 通过才计 |
+| **能效（同时给功耗+性能测量）** | +2 | `pillars.P4.power_indicators` + `perf_indicators` 同时命中 |
+| **Space-only** | 0 | 仅命中 space/satellite，无推理系统机制 |
+| 惩罚：纯 VLA/机器人 | −6 | `downweight` 无系统贡献时 |
+| 惩罚：纯精度 / 纯训练 / 纯卸载 / survey | −5 / −4 / −3 / −2 | 同上，取最严重一项，不堆叠 |
+
+> 防堆叠：`score_caps.max_total_keyword_score = 45`（关键词相关总分上限）。
 
 ## 7. 每日输出分层（filter.py）
 
@@ -81,15 +102,20 @@
 > - `deep_read`：由 LLM 按 A/B/C + 开源 + 显著结果 + 对 7×Thor 价值 综合判断。
 > 若想调整 must_read 门槛，改 `config/research_focus.yaml` 的 `must_read_rules`；若想调整 AI 建议精读，改 `ai/system.txt` 第 6 节口径。
 
-## 8. LLM 摘要（17 字段情报）
+## 8. LLM 摘要（20 字段情报）
 
 `ai/system.txt` + `ai/template.txt` 驱动 `ai/enhance.py`，结构化输出由
-`ai/structure.py` 定义，包含：
+`ai/structure.py` 定义（Pydantic，20 字段），包含：
 
-`主类别 / 副标签 / TL;DR / 研究问题 / 核心方法 / 硬件与互联 / 并行通信调度容错机制 /
-关键结果 / 对比基线 / 对应A/B/C / 对7×Thor启发 / 基础设施假设 / 无NVLink是否成立 /
-差异化研究点 / 建议精读 / 开源代码`。
+`主类别 / 副标签 / 所属Pillar / TL;DR / 研究问题 / 核心方法 / 硬件与互联 /
+并行通信调度容错机制 / 内存与KV cache机制 / 关键结果 / 对比基线 / 测量口径 /
+对应A/B/C / 对7×Thor启发 / 基础设施假设 / 无NVLink是否成立 / 差异化研究点 /
+建议精读 / 开源代码`。
 
+> **Prompt 约束（重要）**：统一内存（unified memory）/ 太空（space）/ MoE / MTP（投机解码）
+> 都不能仅凭关键词直接判定为创新点；需看是否给出在受限/无 NVLink 环境下的可复现机制、
+> 量化结果与测量口径、与通信/调度/容错/内存瓶颈的具体关联。否则不得给高相关或建议精读。
+>
 > 修改摘要口径：编辑 `ai/system.txt` 与 `ai/structure.py`（保持字段名一致），
 > 并同步 `to_md/paper_template.md` 与 `js/app.js` 的渲染。
 
@@ -108,7 +134,13 @@
 
 ## 11. 想换研究方向时
 
-1. 改 `config/research_focus.yaml`（categories / keywords / classification / output）。
+1. 改 `config/research_focus.yaml`（categories / pillars / tags / scoring / output）。
 2. 同步 GitHub Variable `CATEGORIES`（`gh variable set ...`）。
-3. 必要时改 `ai/system.txt` / `ai/structure.py` / `to_md/paper_template.md` / `js/app.js`。
-4. 本地 dry-run：`CATEGORIES=... python ai/scorer.py data/X.jsonl data/X_scored.jsonl && python ai/filter.py data/X_scored.jsonl data/X_top15.jsonl`，人工抽查分层与分类是否合理。
+3. 必要时改 `ai/system.txt` / `ai/structure.py` / `to_md/paper_template.md` / `js/app.js`（保持标签名、字段名一致）。
+4. 本地 dry-run：
+   ```bash
+   CATEGORIES="cs.DC,cs.AR,cs.PF,cs.NI,cs.OS,cs.LG,cs.ET" \
+     python ai/scorer.py data/X.jsonl data/X_scored.jsonl
+   python ai/filter.py data/X_scored.jsonl data/X_top15.jsonl
+   ```
+   人工抽查分层、分类与 pillar 是否合理。

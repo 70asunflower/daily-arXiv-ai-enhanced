@@ -45,7 +45,7 @@ https://github.com/user-attachments/assets/b25712a4-fb8d-484f-863d-e8da6922f9d7
 
 
 # How to use
-This repo is a paper-radar for **bandwidth-constrained, multi-node edge-cluster LLM distributed inference**. It daily crawls arXiv categories **cs.DC, cs.AR, cs.PF, cs.NI, cs.OS** (core) plus **cs.LG, cs.ET** (support, keyword-filtered), and uses an LLM to produce structured Chinese intelligence reports classified into A-测量与瓶颈 / B-通信与调度 / C-容错与弹性 / Infra-推理引擎 / Arch-体系结构 / Space-场景延伸.
+This repo is a paper-radar for **bandwidth-constrained, multi-node edge-cluster LLM distributed inference** (experimental platform: 7×NVIDIA Jetson Thor, no NVLink). It daily crawls arXiv categories **cs.DC, cs.AR, cs.PF, cs.NI, cs.OS** (core) plus **cs.LG, cs.ET** (support, keyword-filtered), and uses an LLM to produce structured Chinese intelligence reports organized around **Four Pillars** (P1 edge-SoC distributed inference & memory / P2 constrained-network comm optimization & elastic recovery / P3 MoE & distributed speculative decoding / P4 energy & resource management) and classified into **11 tags**: Memory-统一内存/KV, MoE-专家并行, Spec-MTP/投机解码, Energy-能效资源, C-容错与弹性, B-通信与调度, A-测量与瓶颈, Infra-推理引擎, Arch-体系结构, Space-场景延伸, Background-支撑. See [RESEARCH_FOCUS.md](./RESEARCH_FOCUS.md) for the full design.
 If you wish to crawl other arXiv categories, use other LLMs, or other languages, please follow the instructions.
 Otherwise, you can directly use this repo in https://70asunflower.github.io/daily-arXiv-ai-enhanced/. Please star it if you like :)
 

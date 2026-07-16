@@ -11,13 +11,13 @@ surviving paper to ONE of three daily tiers:
 Selection rules
 ---------------
 1. Drop papers with score < hard_score_threshold (pure noise).
-2. P0 intersection papers are always kept (force-include) even if below
+2. P1 intersection papers are always kept (force-include) even if below
    the soft ordering, but still subject to the hard threshold.
 3. must_read: highest-scored papers that satisfy must_read_rules
    (main category in A/B/C, reproducible open-source, system/low-bandwidth
    relevance, score >= min_score). Capped at output.must_read.
 4. key: top scoring papers by score (includes must_read ones).
-5. candidate: next best related papers (score above a soft floor), excluding
+5. candidate: next best related papers (score >= soft_floor, default 0), excluding
    those already in key. Capped at output.candidate_papers.
 6. Never pad tiers with weak papers; if the day is thin, emit fewer.
 
@@ -74,7 +74,7 @@ def filter_papers(scored: List[Dict], cfg: Dict) -> List[Dict]:
 
     # 1. hard threshold
     survivors = [p for p in scored if p.get("score", 0) >= hard]
-    # also keep P0 intersections even if below hard (they are forced)
+    # also keep P1 intersections even if below hard (they are forced)
     forced = [p for p in scored if p.get("intersection") and p.get("score", 0) < hard]
     seen = {id(p) for p in survivors}
     for p in forced:

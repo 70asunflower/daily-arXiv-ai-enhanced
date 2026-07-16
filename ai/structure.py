@@ -2,14 +2,14 @@ from pydantic import BaseModel, Field
 
 
 class Structure(BaseModel):
-    """Output schema for the 17-field paper intelligence report.
+    """Output schema for the 20-field paper intelligence report.
 
     Field names are kept mostly stable for frontend/markdown backward-compat:
     tldr / motivation / method / result / conclusion are rendered by the
     existing frontend and convert.py. New fields (problem, hardware, comm_mechanism,
-    key_results, baseline, abc_tag, value_7xthor, infra_assumption, nvlink_free_holds,
-    differentiation, sub_tags, open_source) are available in the JSONL and rendered
-    in the markdown where present.
+    memory_kv, key_results, baseline, measurement, abc_tag, pillar, value_7xthor,
+    infra_assumption, nvlink_free_holds, differentiation, sub_tags, open_source) are
+    available in the JSONL and rendered in the markdown where present.
     """
 
     # === Core rendered fields (frontend + markdown) ===
@@ -40,7 +40,15 @@ class Structure(BaseModel):
     ai_category_tag: str = Field(
         default="Background-支撑",
         description="主类别（由 scorer 输入，取值之一：A-测量与瓶颈 / B-通信与调度 / "
-                    "C-容错与弹性 / Infra-推理引擎 / Arch-体系结构 / Space-场景延伸 / Background-支撑）",
+                    "C-容错与弹性 / Memory-统一内存KV / MoE-专家并行 / Spec-MTP投机解码 / "
+                    "Energy-能效资源 / Infra-推理引擎 / Arch-体系结构 / Space-场景延伸 / Background-支撑）",
+    )
+    pillar: str = Field(
+        default="Background",
+        description="所属 Pillar（沿用 scorer 输入：P1 边缘SoC分布式推理与内存 / "
+                    "P2 受限动态网络通信优化与弹性恢复 / P3 MoE与分布式投机解码 / "
+                    "P4 能耗与资源管理 / Cross 跨支柱 Infra-Arch-Space / Background）。"
+                    "一般直接沿用输入值，不要自行改写。",
     )
     sub_tags: str = Field(
         default="",
@@ -60,6 +68,12 @@ class Structure(BaseModel):
         description="并行/通信/调度/容错机制：TP/PP/混合并行、collective、压缩、overlap、"
                     "KV 迁移/卸载、prefill/decode 分离、容错/恢复策略。无则写“论文摘要未明确”。",
     )
+    memory_kv: str = Field(
+        default="",
+        description="内存与 KV cache 机制：显存/统一内存占用、KV cache 量化/分页/卸载、"
+                    "PagedAttention、KV 压缩、KV 跨节点迁移与复用、上下文长度对内存压力的影响。"
+                    "摘要未明确写“论文摘要未明确”。",
+    )
     key_results: str = Field(
         default="",
         description="关键量化结果（结构化列出，含单位与口径）",
@@ -67,6 +81,12 @@ class Structure(BaseModel):
     baseline: str = Field(
         default="",
         description="对比基线与方法 + 测量口径（如 vs vLLM / vs Megatron，单节点/多节点）",
+    )
+    measurement: str = Field(
+        default="",
+        description="测量口径：实验配置、负载/数据集、指标定义（吞吐 token/s、TTFT、TPOT、"
+                    "尾延迟 p99、带宽利用率、扩展效率）、重复次数与置信区间。务必保留论文原文数字与单位，"
+                    "不要泛化。摘要未明确写“论文摘要未明确”。",
     )
     abc_tag: str = Field(
         default="",
