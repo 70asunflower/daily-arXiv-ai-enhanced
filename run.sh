@@ -23,7 +23,7 @@ if [ -z "$OPENAI_API_KEY" ]; then
     echo "🔧 可选变量 / Optional variables:"
     echo "   export OPENAI_BASE_URL=\"https://api.openai.com/v1\"  # API基础URL / API base URL"
     echo "   export LANGUAGE=\"Chinese\"                           # 语言设置 / Language setting"
-    echo "   export CATEGORIES=\"cs.CV, cs.CL\"                    # 关注分类 / Categories of interest"
+    echo "   export CATEGORIES=\"cs.DC,cs.AR,...\"              # 可选；留空则读 config/research_focus.yaml"
     echo "   export MODEL_NAME=\"gpt-4o-mini\"                     # 模型名称 / Model name"
     echo ""
     echo "💡 设置后重新运行此脚本即可进行完整测试 / After setting, rerun this script for complete testing"
@@ -41,7 +41,9 @@ else
     
     # 设置默认值 / Set default values
     export LANGUAGE="${LANGUAGE:-Chinese}"
-    export CATEGORIES="${CATEGORIES:-cs.DC,cs.AR,cs.PF,cs.NI,cs.OS,cs.LG,cs.ET}"
+    # CATEGORIES 留空 -> 爬虫自动读取 config/research_focus.yaml（core+support）。
+    # 仅一次性调试需要不同分类时才显式设置，例如：export CATEGORIES="cs.DC,cs.LG"
+    export CATEGORIES="${CATEGORIES:-}"                  # 关注分类 / Categories of interest（默认读 config）
     export MODEL_NAME="${MODEL_NAME:-gpt-4o-mini}"
     export OPENAI_BASE_URL="${OPENAI_BASE_URL:-https://api.openai.com/v1}"
     

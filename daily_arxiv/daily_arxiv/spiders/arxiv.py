@@ -3,13 +3,60 @@ import os
 import re
 
 
+def _repo_root():
+    """arxiv.py lives in <repo>/daily_arxiv/daily_arxiv/spiders/ -> repo root is 3 levels up."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    return os.path.abspath(os.path.join(here, "..", "..", ".."))
+
+
+def _load_categories_from_config():
+    """Return [cat, ...] from config/research_focus.yaml (categories.core + categories.support).
+
+    Returns None if the config is missing/unreadable or yaml is unavailable, so the
+    caller can fall back to an explicit env override or a built-in default.
+    """
+    try:
+        import yaml
+    except ImportError:
+        return None
+    try:
+        cfg_path = os.path.join(_repo_root(), "config", "research_focus.yaml")
+        with open(cfg_path, encoding="utf-8") as f:
+            cfg = yaml.safe_load(f) or {}
+        cats = cfg.get("categories", {}) or {}
+        merged = [str(c).strip() for c in (list(cats.get("core", [])) + list(cats.get("support", [])))]
+        merged = [c for c in merged if c]
+        return merged or None
+    except Exception:
+        return None
+
+
 class ArxivSpider(scrapy.Spider):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        categories = os.environ.get("CATEGORIES", "cs.CV")
-        categories = categories.split(",")
+
+        # 抓取分类：config/research_focus.yaml 为单一事实来源（categories.core + categories.support）。
+        # 仅当显式设置非空环境变量 CATEGORIES 时才覆盖（用于一次性 ad-hoc 调试）。
+        # 这样修改研究方向时只需改 config，无需同步 GitHub Variable，
+        # 杜绝“配置/变量漂移”导致静默抓错分类（此前默认 cs.CV 即此类 bug）。
+        env_cats = (os.environ.get("CATEGORIES") or "").strip()
+        if env_cats:
+            raw = env_cats
+            source = "env CATEGORIES (override)"
+        else:
+            cfg_cats = _load_categories_from_config()
+            if cfg_cats:
+                raw = ",".join(cfg_cats)
+                source = "config/research_focus.yaml"
+            else:
+                # 配置缺失时的兜底（与 research_focus.yaml 的 core+support 一致）
+                raw = "cs.DC,cs.AR,cs.PF,cs.NI,cs.OS,cs.LG,cs.ET"
+                source = "built-in fallback"
+
+        categories = [c.strip() for c in raw.split(",") if c.strip()]
         # 保存目标分类列表，用于后续验证
-        self.target_categories = set(map(str.strip, categories))
+        self.target_categories = set(categories)
+        self.logger.info("Target categories (%s): %s", source, sorted(categories))
         self.start_urls = [
             f"https://arxiv.org/list/{cat}/new" for cat in self.target_categories
         ]  # 起始URL（计算机科学领域的最新论文）

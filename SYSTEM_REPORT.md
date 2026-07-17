@@ -166,12 +166,12 @@ daily-arXiv-ai-enhanced/
 ### 8.2 GitHub Variables（仓库 Settings → Variables）
 | Var | 默认值/建议 | 说明 |
 |---|---|---|
-| `CATEGORIES` | `cs.DC,cs.AR,cs.PF,cs.NI,cs.OS,cs.LG,cs.ET` | **必须与 `research_focus.yaml` 的 categories 一致** |
+| `CATEGORIES` | _（留空）_ | **可选覆盖**。留空时爬虫自动读取 `config/research_focus.yaml` 的 `categories`（core+support）；仅一次性调试需要不同分类时才显式设置。 |
 | `LANGUAGE` | `Chinese` | `Chinese` / `English` |
 | `MODEL_NAME` | `deepseek-v4-flash` | |
 | `EMAIL` / `NAME` | 提交用身份 | |
 
-> ⚠️ 若 `CATEGORIES` 变量为空或缺失，爬虫会静默抓到 0 篇（已修复为回退核心分类，但强烈建议显式设置）。
+> 抓取分类的**单一事实来源是 `config/research_focus.yaml`**，无需在 Variable 里重复维护；修改研究方向只改 config 即可，杜绝“配置/变量漂移”导致静默抓错分类（此前爬虫默认 `cs.CV` 即此类 bug，已修复为读 config）。
 
 ### 8.3 研究定位调参
 改 `config/research_focus.yaml`：
@@ -254,6 +254,6 @@ bash run.sh
 
 ## 13. 后续建议
 1. （可选）若希望发布 Markdown 报告，在 `run.yml` 把 `to_md/*.md` 一并复制进 `data` 分支并加入 `file-list.txt`。
-2. （可选）将爬虫默认分类直接读取 `research_focus.yaml`，彻底消除"变量与配置不一致"隐患。
+2. ✅ **已完成**：爬虫默认分类现直接读取 `research_focus.yaml`（config 为单一事实来源），`CATEGORIES` 环境变量降为可选覆盖——彻底消除"变量与配置不一致"隐患。
 3. （安全）若站点内容需要真正访问控制，引入服务端鉴权，替代客户端哈希门禁。
 4. 部署破坏性前端改动时记得 bump `sw.js` 的 `CACHE_VERSION`。

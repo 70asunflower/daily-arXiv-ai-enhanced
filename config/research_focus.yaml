@@ -30,9 +30,11 @@ research:
 
 # -----------------------------------------------------------------------------
 # 1. arXiv 抓取分类
-#    同时设置本文件的 categories，以及 GitHub repo variable CATEGORIES
-#    （run.yml 在 CI 中读取 vars.CATEGORIES 注入爬虫；本地 dry run 用环境变量
-#    CATEGORIES）。两者必须保持一致。
+#    本文件的 categories（core + support）是抓取分类的【单一事实来源】。
+#    爬虫（daily_arxiv/spiders/arxiv.py）默认直接读取这里；仅当显式设置非空
+#    环境变量 CATEGORIES 时才覆盖（一次性 ad-hoc 调试用）。
+#    ⚠️ 因此修改研究方向时只需改本文件，无需同步 GitHub Variable CATEGORIES，
+#       彻底避免“配置/变量漂移”导致静默抓错分类。
 #    支持 new + cross-list；按 arXiv ID 去重；同一论文只保留最新版本。
 #    若只能配置有限分类，优先级：cs.DC > cs.AR > cs.PF > cs.NI > cs.OS > cs.LG > cs.ET
 # -----------------------------------------------------------------------------
