@@ -37,6 +37,32 @@ from typing import Dict, List, Set, Tuple
 
 CONFIG_NAME = "research_focus.yaml"
 
+# 内置兜底 weak keyword -> bucket 映射（与 research_focus.yaml 保持一致）。
+# 仅用于 config 缺失时的回退；正式维护请在 config 的
+# downweight.weak_keyword_buckets 中定义，避免代码硬编码漂移。
+_DEFAULT_WEAK_BUCKET_MAP = {
+    "vla": "pure_vla_robotics",
+    "vision-language-action": "pure_vla_robotics",
+    "embodied intelligence": "pure_vla_robotics",
+    "robot manipulation": "pure_vla_robotics",
+    "pure robotics": "pure_vla_robotics",
+    "autonomous driving perception": "pure_vla_robotics",
+    "pure multimodal benchmark": "pure_vla_robotics",
+    "pure nlp benchmark": "pure_vla_robotics",
+    "recommendation system": "pure_vla_robotics",
+    "medical application": "pure_vla_robotics",
+    "ros 2": "pure_vla_robotics",
+    "robot control": "pure_vla_robotics",
+    "real-time coordination": "pure_vla_robotics",
+    "pure training optimization": "pure_training_optimization",
+    "pure distributed training": "pure_training_optimization",
+    "pure federated learning": "pure_training_optimization",
+    "pure fine-tuning": "pure_training_optimization",
+    "pure model architecture": "pure_model_precision",
+    "pure task offloading": "pure_task_offloading",
+    "survey": "survey",
+}
+
 
 def load_config() -> Dict:
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -207,6 +233,7 @@ def compute_score(item: Dict, cfg: Dict) -> Dict:
     weak = dw.get("weak_keywords", [])
     pen = dw.get("penalties", {})
     exceptions = dw.get("system_exception_keywords", [])
+    # bucket 扣分全部来自 config.penalties（带内置兜底）
     weak_pen_map = {
         "pure_vla_robotics": pen.get("pure_vla_robotics", -6),
         "pure_training_optimization": pen.get("pure_training_optimization", -4),
@@ -214,23 +241,21 @@ def compute_score(item: Dict, cfg: Dict) -> Dict:
         "pure_task_offloading": pen.get("pure_task_offloading", -3),
         "survey": pen.get("survey", -2),
     }
+    # weak keyword -> bucket：优先用 config 的 weak_keyword_buckets（数据驱动），
+    # 避免代码硬编码漂移导致 YAML 新增 weak_keywords 被静默忽略。
+    bucket_map = {_lower(k): v for k, v in dw.get("weak_keyword_buckets", {}).items()}
+    bucket_map = {**_DEFAULT_WEAK_BUCKET_MAP, **bucket_map}  # config 优先覆盖内置兜底
     weak_buckets = set()
     for w in weak:
         lw = _lower(w)
         if lw in text:
-            if w in ("VLA", "vision-language-action", "embodied intelligence",
-                     "robot manipulation", "pure robotics", "autonomous driving perception",
-                     "pure multimodal benchmark", "ROS 2", "robot control", "real-time coordination"):
-                weak_buckets.add("pure_vla_robotics")
-            elif w in ("pure training optimization", "pure distributed training",
-                       "pure federated learning", "pure fine-tuning"):
-                weak_buckets.add("pure_training_optimization")
-            elif w in ("pure model architecture",):
-                weak_buckets.add("pure_model_precision")
-            elif w == "pure task offloading":
-                weak_buckets.add("pure_task_offloading")
-            elif w == "survey":
-                weak_buckets.add("survey")
+            bucket = bucket_map.get(lw)
+            if bucket is None:
+                print(f"[scorer] WARNING: weak keyword '{w}' has no bucket mapping in "
+                      f"research_focus.yaml downweight.weak_keyword_buckets; skipped",
+                      file=sys.stderr)
+                continue
+            weak_buckets.add(bucket)
     has_exception = _has_any(text, exceptions)
     down_score = 0.0
     if weak_buckets and not has_exception:

@@ -1,5 +1,11 @@
-# This workflow will install Python dependencies, run tests and lint with a single version of Python
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+# Daily arXiv AI-Enhanced radar pipeline.
+# Triggers: scheduled daily (cron "0 1 * * *" = 09:00 Beijing) + manual dispatch.
+# Flow: crawl arXiv -> smart dedup -> score/tag -> filter top papers ->
+#       LLM enhance -> convert to Markdown -> (optional) password-protected
+#       static site published via GitHub Pages.
+# Secrets required: OPENAI_API_KEY, OPENAI_BASE_URL, TOKEN_GITHUB (GitHub API auth),
+#                   ACCESS_PASSWORD (optional, enables client-side gate).
+# Vars: CATEGORIES, LANGUAGE, MODEL_NAME, EMAIL, NAME.
 
 name: arXiv-daily-ai-enhanced
 
@@ -150,6 +156,7 @@ jobs:
         export OPENAI_BASE_URL=${{ secrets.OPENAI_BASE_URL }}
         export LANGUAGE="${{ vars.LANGUAGE }}"
         export MODEL_NAME="${{ vars.MODEL_NAME }}"
+        export TOKEN_GITHUB="${{ secrets.TOKEN_GITHUB }}"
         
         python enhance.py --data ../data/${today}_top15.jsonl
         

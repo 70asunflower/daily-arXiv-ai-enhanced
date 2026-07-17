@@ -1,6 +1,7 @@
 import json
 import argparse
 import os
+import re
 from itertools import count
 
 # 新分类体系（与 config/research_focus.yaml 对齐 — 11 个论文标签）
@@ -38,6 +39,20 @@ def resolve_code(item):
         if v == ct:
             return k
     return 'Background'
+
+
+def _render(template: str, fields: dict) -> str:
+    """Brace-safe template substitution.
+
+    Only replaces known ``{key}`` placeholders; any other literal ``{``/``}``
+    in the template (e.g. markdown code blocks) or in the values is left
+    untouched. This avoids str.format() crashing on stray braces in AI content.
+    Keys are sorted longest-first so a key that is a prefix of another still
+    matches correctly.
+    """
+    keys = sorted(fields.keys(), key=len, reverse=True)
+    pattern = re.compile(r"\{(" + "|".join(re.escape(k) for k in keys) + r")\}")
+    return pattern.sub(lambda m: str(fields[m.group(1)]), template)
 
 
 if __name__ == "__main__":
@@ -92,37 +107,40 @@ if __name__ == "__main__":
             tldr = ai.get('tldr', '')
             sub_tags = ', '.join(item.get('sub_tags', []) or [])
 
-            markdown += template.format(
-                idx=next(idx),
-                title=item.get('title', ''),
-                authors=', '.join(item.get('authors', []) or []),
-                url=item.get('abs') or item.get('pdf') or f"https://arxiv.org/abs/{item.get('id', '')}",
-                cat=cat_tag,
-                tier=tier_label,
-                score=f"{score:.1f}",
-                pillar=item.get('pillar', ''),
-                sub_tags=sub_tags,
-                tldr=tldr + deep_icon,
-                problem=ai.get('problem', ''),
-                hardware=ai.get('hardware', ''),
-                method=ai.get('method', ''),
-                comm_mechanism=ai.get('comm_mechanism', ''),
-                memory_kv=ai.get('memory_kv', ''),
-                key_results=ai.get('key_results', ''),
-                baseline=ai.get('baseline', ''),
-                measurement=ai.get('measurement', ''),
-                abc_tag=ai.get('abc_tag', ''),
-                value_7xthor=ai.get('value_7xthor', ''),
-                infra_assumption=ai.get('infra_assumption', ''),
-                nvlink_free_holds=ai.get('nvlink_free_holds', ''),
-                differentiation=ai.get('differentiation', ''),
-                deep_read=('✅ 建议精读' if ai.get('deep_read') else '—'),
-                open_source=ai.get('open_source', '未公开'),
-                motivation=ai.get('motivation', ''),
-                result=ai.get('result', ''),
-                conclusion=ai.get('conclusion', ''),
-                summary=item.get('summary', '')
-            )
+            fields = {
+                "idx": next(idx),
+                "title": item.get('title', ''),
+                "authors": ', '.join(item.get('authors', []) or []),
+                "url": item.get('abs') or item.get('pdf') or f"https://arxiv.org/abs/{item.get('id', '')}",
+                "cat": cat_tag,
+                "tier": tier_label,
+                "score": f"{score:.1f}",
+                "pillar": item.get('pillar', ''),
+                "sub_tags": sub_tags,
+                "tldr": tldr + deep_icon,
+                "problem": ai.get('problem', ''),
+                "hardware": ai.get('hardware', ''),
+                "method": ai.get('method', ''),
+                "comm_mechanism": ai.get('comm_mechanism', ''),
+                "memory_kv": ai.get('memory_kv', ''),
+                "key_results": ai.get('key_results', ''),
+                "baseline": ai.get('baseline', ''),
+                "measurement": ai.get('measurement', ''),
+                "abc_tag": ai.get('abc_tag', ''),
+                "value_7xthor": ai.get('value_7xthor', ''),
+                "infra_assumption": ai.get('infra_assumption', ''),
+                "nvlink_free_holds": ai.get('nvlink_free_holds', ''),
+                "differentiation": ai.get('differentiation', ''),
+                "deep_read": ('✅ 建议精读' if ai.get('deep_read') else '—'),
+                "open_source": ai.get('open_source', '未公开'),
+                "motivation": ai.get('motivation', ''),
+                "result": ai.get('result', ''),
+                "conclusion": ai.get('conclusion', ''),
+                # M1: deep_read (LLM 信号) 与 tier (规则信号) 是两个独立维度，可能不一致；
+                # 这里分别渲染，互不覆盖，便于人工核对两者矛盾。
+                "summary": item.get('summary', ''),
+            }
+            markdown += _render(template, fields)
 
     base = os.path.basename(args.data)
     name = base.split('_AI_enhanced_')[0].rsplit('.jsonl', 1)[0]

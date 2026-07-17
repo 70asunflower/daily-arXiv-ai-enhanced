@@ -128,10 +128,31 @@ const Auth = {
      * @param {boolean} remember - Whether to remember login for 7 days (default: true)
      * @returns {Promise<boolean>} True if authentication successful
      */
+    /**
+     * Constant-time string comparison (mitigates trivial timing leaks).
+     *
+     * SECURITY NOTE: client-side password gating on a static GitHub Pages site
+     * is obfuscation-only. The SHA-256 hash and this comparison logic ship in
+     * the public JS, so anyone can read them — this does NOT provide real
+     * confidentiality. It only raises the bar against casual snooping. Do not
+     * rely on it to protect genuinely sensitive content.
+     */
+    _constantTimeEquals(a, b) {
+        if (typeof a !== 'string' || typeof b !== 'string') return false;
+        const bufA = new TextEncoder().encode(a);
+        const bufB = new TextEncoder().encode(b);
+        if (bufA.length !== bufB.length) return false;
+        let diff = 0;
+        for (let i = 0; i < bufA.length; i++) {
+            diff |= bufA[i] ^ bufB[i];
+        }
+        return diff === 0;
+    },
+
     async login(password, remember = true) {
         const inputHash = await this.hashPassword(password);
 
-        if (inputHash === AUTH_CONFIG.passwordHash) {
+        if (this._constantTimeEquals(inputHash, AUTH_CONFIG.passwordHash)) {
             const now = Date.now();
             // Remember: 7 days, otherwise: 1 day
             const expireTime = remember
@@ -170,7 +191,7 @@ const Auth = {
             return false;
         }
 
-        return token === AUTH_CONFIG.passwordHash;
+        return this._constantTimeEquals(token, AUTH_CONFIG.passwordHash);
     },
 
     /**

@@ -73,14 +73,21 @@ def filter_papers(scored: List[Dict], cfg: Dict) -> List[Dict]:
     rules = cfg.get("must_read_rules", {})
 
     # 1. hard threshold
-    survivors = [p for p in scored if p.get("score", 0) >= hard]
-    # also keep P1 intersections even if below hard (they are forced)
-    forced = [p for p in scored if p.get("intersection") and p.get("score", 0) < hard]
-    seen = {id(p) for p in survivors}
-    for p in forced:
-        if id(p) not in seen:
-            survivors.append(p)
-            seen.add(id(p))
+    # 交集论文的 P1 +8 已使其分数高于 hard 阈值；文档约定交集仍受 hard 阈值约束，
+    # 因此无需“强制保留低于阈值的论文”（原 forced 分支对正常阈值恒为空，属死代码）。
+    # 去重按 arXiv id（稳定值），而非 Python 对象身份 id(p)——后者在论文以不同 dict
+    # 对象出现（如重新解析 JSONL）时会漏判重复。
+    seen_ids = set()
+    survivors = []
+    for p in scored:
+        if p.get("score", 0) < hard:
+            continue
+        pid = p.get("id")
+        if pid is not None and pid in seen_ids:
+            continue
+        if pid is not None:
+            seen_ids.add(pid)
+        survivors.append(p)
 
     if not survivors:
         return []
@@ -92,7 +99,7 @@ def filter_papers(scored: List[Dict], cfg: Dict) -> List[Dict]:
     used_ids = set()
 
     def take(p):
-        uid = id(p)
+        uid = p.get("id")
         if uid in used_ids:
             return False
         used_ids.add(uid)
@@ -109,7 +116,7 @@ def filter_papers(scored: List[Dict], cfg: Dict) -> List[Dict]:
     for p in survivors:
         if len([r for r in result if r.get("tier") == "key" or r.get("tier") == "must_read"]) >= n_key:
             break
-        if id(p) in used_ids:
+        if p.get("id") in used_ids:
             continue
         p["tier"] = "key"
         take(p)
@@ -119,7 +126,7 @@ def filter_papers(scored: List[Dict], cfg: Dict) -> List[Dict]:
     for p in survivors:
         if len([r for r in result if r.get("tier") == "candidate"]) >= n_cand:
             break
-        if id(p) in used_ids:
+        if p.get("id") in used_ids:
             continue
         if p.get("score", 0) < soft_floor:
             continue

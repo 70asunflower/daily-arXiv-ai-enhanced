@@ -400,6 +400,31 @@ downweight:
     - memory
     - KV cache
     - LLM inference
+  # weak keyword -> bucket 映射（数据驱动）。
+  # 新增 weak_keywords 时务必在这里给出 bucket，否则该词会被静默忽略（见 scorer.py 警告）。
+  # bucket 取值：pure_vla_robotics / pure_training_optimization / pure_model_precision /
+  #              pure_task_offloading / survey（对应 penalties 中的扣分）。
+  weak_keyword_buckets:
+    VLA: pure_vla_robotics
+    vision-language-action: pure_vla_robotics
+    embodied intelligence: pure_vla_robotics
+    robot manipulation: pure_vla_robotics
+    pure robotics: pure_vla_robotics
+    autonomous driving perception: pure_vla_robotics
+    pure multimodal benchmark: pure_vla_robotics
+    pure NLP benchmark: pure_vla_robotics
+    recommendation system: pure_vla_robotics
+    medical application: pure_vla_robotics
+    ROS 2: pure_vla_robotics
+    robot control: pure_vla_robotics
+    real-time coordination: pure_vla_robotics
+    pure training optimization: pure_training_optimization
+    pure distributed training: pure_training_optimization
+    pure federated learning: pure_training_optimization
+    pure fine-tuning: pure_training_optimization
+    pure model architecture: pure_model_precision
+    pure task offloading: pure_task_offloading
+    survey: survey
 
 # -----------------------------------------------------------------------------
 # 7. 强相关系统 / 引擎（额外加分）
