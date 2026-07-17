@@ -4,6 +4,8 @@ import os
 import re
 from itertools import count
 
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # 新分类体系（与 config/research_focus.yaml 对齐 — 11 个论文标签）
 TAXONOMY_ORDER = ['Memory', 'MoE', 'Spec', 'Energy', 'C', 'B', 'A', 'Infra', 'Arch', 'Space', 'Background']
 TAXONOMY_TAGS = {
@@ -81,7 +83,7 @@ if __name__ == "__main__":
     for code in groups:
         groups[code].sort(key=lambda x: (tier_rank.get(x.get('tier'), 3), -x.get('score', 0)))
 
-    template = open("paper_template.md", "r", encoding="utf-8").read()
+    template = open(os.path.join(_SCRIPT_DIR, "paper_template.md"), "r", encoding="utf-8").read()
 
     markdown = "# 论文雷达 / Paper Radar\n\n"
     markdown += "## 目录 / Contents\n\n"

@@ -14,8 +14,9 @@ let userKeywords = []; // 存储用户的关键词
 let activeAuthors = []; // 存储激活的作者
 let userAuthors = []; // 存储用户的作者
 
-// 强制覆盖 data-config.js（防止缓存导致 repoOwner 为 dw-dengwei）
-if (!window.DATA_CONFIG || window.DATA_CONFIG.repoOwner !== '70asunflower') {
+// 仅在 data-config.js 未正确加载时才回退到默认值；
+// 正常 CI 注入的仓库信息（fork 场景）必须被尊重，不要强制覆盖为 70asunflower。
+if (!window.DATA_CONFIG || !window.DATA_CONFIG.repoOwner) {
   window.DATA_CONFIG = {
     repoOwner: '70asunflower',
     repoName: 'daily-arXiv-ai-enhanced',
@@ -408,7 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function fetchGitHubStats() {
   try {
-    const response = await fetch('https://api.github.com/repos/70asunflower/daily-arXiv-ai-enhanced');
+    const response = await fetch(`https://api.github.com/repos/${DATA_CONFIG.repoOwner}/${DATA_CONFIG.repoName}`);
     const data = await response.json();
     const starCount = data.stargazers_count;
     const forkCount = data.forks_count;

@@ -164,15 +164,19 @@ def process_single_item(client, item: Dict, language: str, model_name: str) -> D
     if code_info:
         item.update(code_info)
 
-    """处理单个数据项 —— 直接调用 OpenAI 兼容 SDK（json_mode 结构化输出），失败时尽力修复 JSON / 重试"""
+    # Brace-safe fill. arXiv abstracts routinely contain LaTeX braces
+    # (e.g. "\{0,1\}^n", "$\mathbb{R}$"); str.format() would parse those as
+    # format fields and raise KeyError/IndexError, silently downgrading the
+    # paper to all-default placeholders. Plain .replace() is immune to that.
     messages = [
         {"role": "system", "content": system},
-        {"role": "user", "content": template.format(
-            category_tag=item.get("category_tag", "Background-支撑"),
-            pillar=item.get("pillar", "Background"),
-            matched_keywords=", ".join(item.get("matched_keywords", [])),
-            score=f"{item.get('score', 0):.1f}",
-            content=item.get("summary", ""),
+        {"role": "user", "content": (
+            template
+            .replace("{category_tag}", item.get("category_tag", "Background-支撑"))
+            .replace("{pillar}", item.get("pillar", "Background"))
+            .replace("{matched_keywords}", ", ".join(item.get("matched_keywords", [])))
+            .replace("{score}", f"{item.get('score', 0):.1f}")
+            .replace("{content}", item.get("summary", ""))
         )},
     ]
 
