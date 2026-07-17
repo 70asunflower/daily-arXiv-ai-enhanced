@@ -17,10 +17,14 @@ from openai import OpenAI
 from structure import Structure
 from pydantic import ValidationError
 
-if os.path.exists('.env'):
-    dotenv.load_dotenv()
-template = open("template.txt", "r").read()
-system = open("system.txt", "r").read()
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_env_path = os.path.join(_SCRIPT_DIR, '.env')
+if os.path.exists(_env_path):
+    dotenv.load_dotenv(_env_path)
+with open(os.path.join(_SCRIPT_DIR, "template.txt"), "r", encoding="utf-8") as f:
+    template = f.read()
+with open(os.path.join(_SCRIPT_DIR, "system.txt"), "r", encoding="utf-8") as f:
+    system = f.read()
 
 def parse_args():
     """解析命令行参数"""
@@ -29,7 +33,7 @@ def parse_args():
     parser.add_argument("--max_workers", type=int, default=1, help="Maximum number of parallel workers")
     return parser.parse_args()
 
-# 结构化输出失败时使用的默认值（必须匹配 structure.py 的 20 字段 schema）
+# 结构化输出失败时使用的默认值（必须匹配 structure.py 的 23 字段 schema）
 DEFAULT_AI_FIELDS = {
     "tldr": "摘要生成失败",
     "motivation": "研究问题分析不可用",
@@ -168,7 +172,7 @@ def process_single_item(client, item: Dict, language: str, model_name: str) -> D
             pillar=item.get("pillar", "Background"),
             matched_keywords=", ".join(item.get("matched_keywords", [])),
             score=f"{item.get('score', 0):.1f}",
-            content=item['summary'],
+            content=item.get("summary", ""),
         )},
     ]
 
@@ -181,7 +185,8 @@ def process_single_item(client, item: Dict, language: str, model_name: str) -> D
                 messages=messages,
                 response_format={"type": "json_object"},
                 temperature=0,
-                max_tokens=2048,
+                max_tokens=4096,
+                timeout=60,
                 extra_body={"thinking": {"type": "disabled"}},
             )
             msg = resp.choices[0].message
@@ -292,6 +297,21 @@ def main():
         language,
         args.max_workers
     )
+
+    # Fail loud if the majority of records are all-default placeholders
+    # (i.e. the LLM call failed for most papers). Without this, a total API
+    # outage would publish "摘要生成失败" garbage with a green run, which is
+    # exactly how the silent data-rot bug hid for days.
+    total = len(processed_data)
+    failed = sum(
+        1 for it in processed_data
+        if isinstance(it, dict) and it.get("AI", {}).get("tldr") == "摘要生成失败"
+    )
+    if total and failed / total > 0.5:
+        print(f"FATAL: {failed}/{total} papers are all-default placeholders; "
+              f"LLM enhancement likely failed. Aborting to avoid publishing garbage.",
+              file=sys.stderr)
+        sys.exit(1)
 
     # 保存结果
     with open(target_file, "w") as f:
